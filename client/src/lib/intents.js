@@ -1,5 +1,6 @@
-// Simple Intent Router for Tunisian Darja
+import axios from 'axios';
 
+// Simple Intent Router for Tunisian Darja
 export const INTENTS = {
   HOME: 'HOME',
   LOGIN: 'LOGIN',
@@ -11,7 +12,8 @@ export const INTENTS = {
   UNKNOWN: 'UNKNOWN'
 };
 
-export const parseIntent = (text) => {
+// Local Rule-Based Parsing (Fallback & Fast Path)
+export const parseIntentLocal = (text) => {
   if (!text) return { intent: INTENTS.UNKNOWN, confidence: 0 };
   
   const normalized = text.toLowerCase().trim();
@@ -19,6 +21,7 @@ export const parseIntent = (text) => {
   // Home/Landing Rules
   if (
     normalized.includes('الرئيسية') || 
+    normalized.includes('الرئيسيه') || 
     normalized.includes('home') || 
     normalized.includes('البداية') ||
     normalized.includes('رجعني') ||
@@ -26,8 +29,9 @@ export const parseIntent = (text) => {
     normalized.includes('أرجع') ||
     normalized.includes('الدار') ||
     normalized.includes('رجوع') ||
-    normalized.includes('الصفحه الرئيسيه') ||
-    normalized.includes('أول')
+    normalized.includes('أول') ||
+    normalized.includes('واجهة') ||
+    normalized.includes('واجهه')
   ) {
     return { intent: INTENTS.HOME, confidence: 0.9 };
   }
@@ -99,4 +103,36 @@ export const parseIntent = (text) => {
   }
 
   return { intent: INTENTS.UNKNOWN, confidence: 0 };
+};
+
+// Hybrid Parsing: Rules first, then LLM
+export const parseIntent = async (text) => {
+    // 1. Try Local Rules First (Fast)
+    const localResult = parseIntentLocal(text);
+    
+    // If high confidence, return immediately
+    if (localResult.confidence >= 0.8) {
+        console.log(`[Intent] Local Match: ${localResult.intent} (${localResult.confidence})`);
+        return localResult;
+    }
+
+    // 2. If unclear, call Backend LLM (Slow but Smart)
+    try {
+        console.log(`[Intent] Calling LLM for: "${text}"`);
+        const response = await axios.post('http://localhost:4000/api/nlu/intent', { text });
+        
+        if (response.data && response.data.intent) {
+             console.log(`[Intent] LLM Match: ${response.data.intent} (${response.data.confidence})`);
+             return {
+                 intent: response.data.intent,
+                 confidence: response.data.confidence || 0.7,
+                 reply: response.data.reply_darija // Optional: use this for TTS response
+             };
+        }
+    } catch (error) {
+        console.error("[Intent] LLM Call Failed:", error);
+    }
+
+    // 3. Fallback to local result if LLM fails
+    return localResult;
 };
