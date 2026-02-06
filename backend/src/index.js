@@ -17,8 +17,10 @@ app.use(express.json());
 
 // CORS Configuration
 app.use(cors({
-  origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Routes
@@ -27,6 +29,7 @@ app.use('/api', require('./routes/profile'));
 app.use('/api', require('./routes/bank'));
 app.use('/api', require('./routes/courses'));
 app.use('/api', require('./routes/prices'));
+app.use('/api/nlu', require('./routes/nlu'));
 app.use('/api/auth', require('./routes/auth'));
 
 // 404

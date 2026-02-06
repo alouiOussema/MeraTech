@@ -172,8 +172,8 @@ export function VoiceProvider({ children }) {
 
   // --- Intent Handling ---
 
-  const handleCommand = (text) => {
-    const { intent, confidence } = parseIntent(text);
+  const handleCommand = async (text) => {
+    const { intent, confidence, reply } = await parseIntent(text);
     console.log(`[VoiceContext] Processing: "${text}" -> ${intent} (${confidence})`);
 
     // Feedback for unclear speech
@@ -184,26 +184,45 @@ export function VoiceProvider({ children }) {
         return;
     }
 
-    // 1. Check Global Intents
+    // Use LLM reply if available (smart conversational response)
+    if (reply) {
+        speakText(reply);
+    } else {
+        // Fallback generic replies
+        switch (intent) {
+            case INTENTS.HOME:
+                speakText("باهي، نمشيو للصفحة الرئيسية");
+                break;
+            case INTENTS.LOGIN:
+                speakText("باهي، نمشيو للدخول");
+                break;
+            case INTENTS.REGISTER:
+                speakText("باهي، نمشيو للتسجيل");
+                break;
+            case INTENTS.BANK:
+                speakText("باهي، نمشيو للبنك");
+                break;
+            case INTENTS.COURSES:
+                speakText("باهي، نمشيو للكورسة");
+                break;
+        }
+    }
+
+    // Navigation logic
     switch (intent) {
         case INTENTS.HOME:
-          speakText("باهي، نمشيو للصفحة الرئيسية");
           navigate('/');
           return;
         case INTENTS.LOGIN:
-          speakText("باهي، نمشيو للدخول");
           navigate('/login');
           return;
         case INTENTS.REGISTER:
-          speakText("باهي، نمشيو للتسجيل");
           navigate('/register');
           return;
         case INTENTS.BANK:
-          speakText("باهي، نمشيو للبنك");
           navigate('/banque');
           return;
         case INTENTS.COURSES:
-          speakText("باهي، نمشيو للكورسة");
           navigate('/courses');
           return;
         case INTENTS.HELP:
