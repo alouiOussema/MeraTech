@@ -27,6 +27,7 @@ app.use('/api', require('./routes/profile'));
 app.use('/api', require('./routes/bank'));
 app.use('/api', require('./routes/courses'));
 app.use('/api', require('./routes/prices'));
+app.use('/api/voice', require('./routes/voice'));
 app.use('/api/auth', require('./routes/auth'));
 
 // 404
