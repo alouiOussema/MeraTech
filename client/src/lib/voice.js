@@ -1,8 +1,15 @@
 // Voice Synthesis (TTS) and Recognition (STT) Utilities
 
-export const speak = (text, onEnd) => {
+// Diagnostic Logger
+export const log = (type, message, data = null) => {
+  const timestamp = new Date().toLocaleTimeString();
+  const style = type === 'error' ? 'background: #fee; color: #c00' : 'background: #e6f7ff; color: #0066cc';
+  console.log(`%c[Voice:${type.toUpperCase()}] ${timestamp} - ${message}`, style, data || '');
+};
+
+export const speak = (text, onEnd, onError) => {
   if (!window.speechSynthesis) {
-    console.error("Speech Synthesis not supported");
+    log('error', "Speech Synthesis not supported");
     return;
   }
 
@@ -10,107 +17,75 @@ export const speak = (text, onEnd) => {
   window.speechSynthesis.cancel();
 
   const utterance = new SpeechSynthesisUtterance(text);
+  
   // Try to find an Arabic voice
   const voices = window.speechSynthesis.getVoices();
-  const arabicVoice = voices.find(v => v.lang.includes('ar'));
+  
+  // 1. Look for "Google" Arabic voices (usually high quality)
+  // 2. Look for any voice starting with "ar"
+  const arabicVoice = voices.find(v => v.lang.includes('ar') && v.name.includes('Google')) || 
+                      voices.find(v => v.lang.includes('ar'));
   
   if (arabicVoice) {
     utterance.voice = arabicVoice;
+    // Keep the voice's native language if possible, otherwise force SA
+    utterance.lang = arabicVoice.lang; 
+  } else {
+    // Fallback if no specific voice object found, hope the browser engine handles the locale
+    utterance.lang = 'ar-SA'; 
   }
-  
-  utterance.lang = 'ar-TN'; // Tunisian Arabic if available, else Arabic
-  utterance.rate = 0.9; // Slightly slower for clarity
+
+  // Force ar-SA if the selected voice is generic, as ar-TN TTS is very rare
+  if (!utterance.voice || !utterance.voice.lang.includes('TN')) {
+     utterance.lang = 'ar-SA';
+  }
+
+  utterance.rate = 1.0; // Slightly faster for standard Arabic
   utterance.pitch = 1;
 
-  if (onEnd) {
-    utterance.onend = onEnd;
-  }
+  utterance.onstart = () => log('info', `Speaking: "${text}"`);
+  
+  utterance.onend = () => {
+    log('info', "Finished speaking");
+    if (onEnd) onEnd();
+  };
 
-  console.log(`[Voice] Speaking: "${text}"`);
+  utterance.onerror = (e) => {
+    log('error', "TTS Error", e);
+    if (e.error === 'not-allowed' && onError) {
+        onError(e);
+    } else {
+        // For other errors, just proceed to avoid getting stuck
+        if (onEnd) onEnd();
+    }
+  };
+
   window.speechSynthesis.speak(utterance);
 };
 
 export const stopSpeaking = () => {
   if (window.speechSynthesis) {
     window.speechSynthesis.cancel();
+    log('info', "Stopped speaking manually");
   }
 };
 
 export const checkMicrophonePermission = async () => {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    // Stop the stream immediately, we just wanted to ask for permission
+    // Stop the stream immediately, we just wanted to ask/check permission
     stream.getTracks().forEach(track => track.stop());
+    log('info', "Microphone permission confirmed");
     return 'granted';
   } catch (error) {
-    console.error("[Voice] Mic permission denied/error:", error);
+    log('error', "Mic permission denied/error", error);
     return 'denied';
   }
 };
 
 // Speech Recognition (STT)
-export const startListening = (onResult, onError, onEnd, options = {}) => {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  
-  if (!SpeechRecognition) {
-    console.error("Speech Recognition not supported");
-    if (onError) onError("المتصفح هذا ما يدعمش الصوت");
-    return null;
-  }
-
-  const recognition = new SpeechRecognition();
-  recognition.lang = 'ar-TN'; 
-  recognition.continuous = options.continuous !== undefined ? options.continuous : true;
-  recognition.interimResults = options.interimResults !== undefined ? options.interimResults : true;
-
-  recognition.onresult = (event) => {
-    // With continuous=true, we might get multiple results.
-    // We are interested in the latest final result or the interim result.
-    let finalTranscript = '';
-    let interimTranscript = '';
-
-    for (let i = event.resultIndex; i < event.results.length; ++i) {
-      if (event.results[i].isFinal) {
-        finalTranscript += event.results[i][0].transcript;
-      } else {
-        interimTranscript += event.results[i][0].transcript;
-      }
-    }
-
-    if (finalTranscript) {
-      console.log("[Voice] Final Transcript:", finalTranscript);
-      if (onResult) onResult(finalTranscript, true); // true = isFinal
-    } else if (interimTranscript) {
-      // console.log("[Voice] Interim:", interimTranscript);
-      if (onResult) onResult(interimTranscript, false); // false = isFinal
-    }
-  };
-
-  recognition.onerror = (event) => {
-    // Ignore "no-speech" errors in continuous mode usually, but good to log
-    if (event.error === 'no-speech') {
-       // console.log("[Voice] No speech detected (normal in continuous)");
-       return; 
-    }
-    console.error("[Voice] Speech recognition error", event.error);
-    if (onError) onError(event.error);
-  };
-
-  recognition.onstart = () => {
-    console.log("[Voice] Recognition started");
-  };
-
-  recognition.onend = () => {
-    console.log("[Voice] Recognition ended");
-    if (onEnd) onEnd();
-  };
-
-  try {
-    recognition.start();
-    console.log("[Voice] recognition.start() called");
-    return recognition;
-  } catch (e) {
-    console.error("[Voice] Error starting recognition", e);
-    return null;
-  }
+export const startListening = async (onResult, onError, onEnd, options = {}) => {
+  // Deprecated: VoiceContext now uses react-speech-recognition
+  log('warn', "voice.js startListening is deprecated. Use VoiceContext instead.");
+  return null;
 };

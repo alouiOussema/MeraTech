@@ -1,6 +1,7 @@
 // Simple Intent Router for Tunisian Darja
 
 export const INTENTS = {
+  HOME: 'HOME',
   LOGIN: 'LOGIN',
   REGISTER: 'REGISTER',
   BANK: 'BANK',
@@ -14,6 +15,22 @@ export const parseIntent = (text) => {
   if (!text) return { intent: INTENTS.UNKNOWN, confidence: 0 };
   
   const normalized = text.toLowerCase().trim();
+
+  // Home/Landing Rules
+  if (
+    normalized.includes('الرئيسية') || 
+    normalized.includes('home') || 
+    normalized.includes('البداية') ||
+    normalized.includes('رجعني') ||
+    normalized.includes('main') ||
+    normalized.includes('أرجع') ||
+    normalized.includes('الدار') ||
+    normalized.includes('رجوع') ||
+    normalized.includes('الصفحه الرئيسيه') ||
+    normalized.includes('أول')
+  ) {
+    return { intent: INTENTS.HOME, confidence: 0.9 };
+  }
 
   // Login Rules
   if (
@@ -66,6 +83,7 @@ export const parseIntent = (text) => {
     normalized.includes('مساعدة') || 
     normalized.includes('عاوني') || 
     normalized.includes('شنوة نعمل') ||
+    normalized.includes('الإعدادات') ||
     normalized.includes('help')
   ) {
     return { intent: INTENTS.HELP, confidence: 0.9 };
