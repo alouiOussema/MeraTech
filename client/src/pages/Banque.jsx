@@ -35,20 +35,10 @@ export default function Banque() {
     fetchData();
   }, []);
 
-  const handleVoiceCommand = useCallback((command) => {
-    // Simple command parsing simulation
-    if (command.includes("رصيدي")) {
-      speak(`رصيدك الحالي هو ${balance} دينار`);
-    } else {
-        speak("ما فهمتكش، تنجم تسألني على رصيدك");
-    }
-  }, [balance]);
+  // Voice command handling is now managed globally by VoiceOperator
+  // to support complex NLU commands (e.g., "هزني للبنك", "قداش عندي فلوس")
+  // which might overlap with local commands.
 
-  // Register voice handler
-  useEffect(() => {
-    const unregister = registerPageHandler(handleVoiceCommand);
-    return unregister;
-  }, [registerPageHandler, handleVoiceCommand]);
 
   const handleTransfer = async (e) => {
     e.preventDefault();

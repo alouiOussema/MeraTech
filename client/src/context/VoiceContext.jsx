@@ -1,4 +1,3 @@
-
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
@@ -23,8 +22,41 @@ export function VoiceProvider({ children }) {
     listening,
     resetTranscript,
     browserSupportsSpeechRecognition,
-    isMicrophoneAvailable
-  } = useSpeechRecognition();
+    isMicrophoneAvailable,
+    error // Destructure error
+  } = useSpeechRecognition({
+    transcribing: true,
+    clearTranscriptOnListen: true
+  });
+
+  // Log errors
+  useEffect(() => {
+    if (error) {
+      log('error', "Speech Recognition Error:", error);
+    }
+  }, [error]);
+
+  // Diagnostic: Monitor Microphone Availability
+  useEffect(() => {
+    log('info', `Microphone availability changed: ${isMicrophoneAvailable ? 'Available' : 'Unavailable'}`);
+  }, [isMicrophoneAvailable]);
+
+  // Diagnostic: Monitor Network Status (Crucial for Cloud Speech API)
+  useEffect(() => {
+    const handleOnline = () => log('info', "Network is Online - Voice services available");
+    const handleOffline = () => log('error', "Network is Offline - Voice services may fail");
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    // Initial check
+    if (!navigator.onLine) log('error', "Initial Network Status: Offline");
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -32,8 +64,6 @@ export function VoiceProvider({ children }) {
   // Refs for state access
   const isExpectedListening = useRef(false);
   const [isAssistantEnabled, setIsAssistantEnabled] = useState(false);
-
-  // --- Core Listening Logic ---
 
   const startListeningSafe = useCallback(() => {
     isExpectedListening.current = true;
@@ -48,7 +78,7 @@ export function VoiceProvider({ children }) {
 
       SpeechRecognition.startListening({
         continuous: true,
-        language: 'ar-TN',
+        language: 'ar-TN', // Optimized for Tunisian dialect
         interimResults: true
       });
       log('info', "Called SpeechRecognition.startListening (ar-TN, Continuous)");
@@ -75,7 +105,7 @@ export function VoiceProvider({ children }) {
     }
   }, [transcript, listening]);
 
-  // Silence Timer - Extended to 2s for better user experience
+  // Silence Timer - Optimized for responsiveness
   useEffect(() => {
     if (transcript && listening) {
       const timer = setTimeout(() => {
@@ -85,7 +115,7 @@ export function VoiceProvider({ children }) {
           handleCommand(cleanText);
           resetTranscript();
         }
-      }, 2000); // 2.0s of silence -> process (more time for users to think)
+      }, 1500); // 1.5s
       return () => clearTimeout(timer);
     }
   }, [transcript, listening, resetTranscript]);
@@ -120,7 +150,7 @@ export function VoiceProvider({ children }) {
       }
     }, (error) => {
       if (error.error === 'not-allowed') {
-        log('warn', "TTS Autoplay blocked. Requesting user interaction.");
+        log('warn', "TTS Autoplay blocked. Requesting user interaction.");   
         setAutoStartBlocked(true);
       }
       if (wasListening) {
@@ -145,7 +175,7 @@ export function VoiceProvider({ children }) {
       setLastSpokenText(text);
       commandHandler(text);
     } else {
-      console.log('[VoiceContext] No handler registered for:', text);
+      console.log('[VoiceContext] No handler registered for:', text);        
     }
   };
 
@@ -173,7 +203,7 @@ export function VoiceProvider({ children }) {
     setPermissionStatus(status);
 
     if (status === 'granted') {
-      speakText("مرحبا بك في منصة إبصار. أنا المساعد الصوتي.", () => {
+      speakText("مرحبا بك في منصة إبصار. أنا المساعد الصوتي.", () => {       
         startListeningSafe();
       });
     } else {
@@ -194,10 +224,6 @@ export function VoiceProvider({ children }) {
     }
   };
 
-  // Route Announcements & Hotkeys - MOVED TO VoiceOperator mostly, 
-  // but keeping Hotkeys here for global access if needed.
-  // Actually, VoiceOperator should handle route announcements.
-
   // Global Hotkeys
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -211,7 +237,7 @@ export function VoiceProvider({ children }) {
       }
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);       
   }, [toggleListening, repeatLast]);
 
   // Initial mount
@@ -237,9 +263,13 @@ export function VoiceProvider({ children }) {
     isAssistantEnabled, // Expose persistent state
     transcript,
     interimTranscript: transcript,
+    error, // Expose error to UI
+    isMicrophoneAvailable, // Expose mic status
+    browserSupportsSpeechRecognition, // Expose browser support
     toggleListening,
     speak: speakText,
     stopSpeaking,
+    startListening: startListeningSafe, // Expose startListening
     repeatLast,
     setCommandHandler, // New API
     permissionStatus,

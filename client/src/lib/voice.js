@@ -23,11 +23,13 @@ export const speak = (text, onEnd, onError, customRate = null) => {
     // Try to find an Arabic voice
     const voices = window.speechSynthesis.getVoices();
     
-
+    // Preference list for better quality voices
     const arabicVoice = 
-      voices.find(v => v.lang.includes('ar') && v.name.toLowerCase().includes('google')) || 
-      voices.find(v => v.lang.includes('ar') && v.name.toLowerCase().includes('microsoft')) ||
-      voices.find(v => v.lang.includes('ar'));
+      voices.find(v => v.lang.includes('ar') && v.name.toLowerCase().includes('google')) || // Google Arabic (Android/Chrome)
+      voices.find(v => v.lang.includes('ar') && v.name.toLowerCase().includes('hoda')) ||   // Microsoft Hoda (Windows)
+      voices.find(v => v.lang.includes('ar') && v.name.toLowerCase().includes('naayf')) ||  // Microsoft Naayf (Windows)
+      voices.find(v => v.lang.includes('ar') && v.name.toLowerCase().includes('microsoft')) || // Generic Microsoft
+      voices.find(v => v.lang.includes('ar')); // Any Arabic
     
     if (arabicVoice) {
       utterance.voice = arabicVoice;
@@ -38,8 +40,8 @@ export const speak = (text, onEnd, onError, customRate = null) => {
       log('warn', "No specific Arabic voice found. Using default ar-TN.");
     }
 
-    // Slower rate for better clarity and comprehension (critical for blind users)
-    utterance.rate = customRate !== null ? customRate : 0.85;
+    // Rate optimized for naturalness (0.9 is better than 0.85 for modern voices)
+    utterance.rate = customRate !== null ? customRate : 0.9;
     utterance.pitch = 1;
 
     utterance.onstart = () => log('info', `Speaking: "${text}"`);

@@ -10,7 +10,9 @@ export default function VoiceOperator() {
   const {
     setCommandHandler,
     speak,
+    startListening, // Import startListening
     isListening,
+    transcript, // Import transcript for debug
     requestPermissionManual
   } = useVoice();
 
@@ -55,7 +57,11 @@ export default function VoiceOperator() {
         setTimeout(() => {
           console.log('[VoiceOperator] Attempting to speak welcome message:', script.welcome);
           try {
-            speak(script.welcome);
+            // Explicitly start listening after the welcome message to ensure seamless interaction
+            speak(script.welcome, () => {
+              console.log('[VoiceOperator] Welcome message finished. Starting listening...');
+              startListening();
+            });
           } catch (err) {
             console.error('[VoiceOperator] Failed to speak welcome message:', err);
           }
@@ -226,5 +232,38 @@ export default function VoiceOperator() {
 
   };
 
-  return null; // Logic only component
+  // 4. Debug Overlay (Visible only in dev or if needed)
+  if (false) { // Disabled
+    return (
+      <div style={{
+        position: 'fixed',
+        bottom: '10px',
+        right: '10px',
+        background: 'rgba(0,0,0,0.9)',
+        color: '#fff',
+        padding: '15px',
+        borderRadius: '8px',
+        zIndex: 9999,
+        maxWidth: '350px',
+        fontSize: '12px',
+        pointerEvents: 'none'
+      }}>
+        <div style={{marginBottom: '5px', fontSize: '14px', borderBottom: '1px solid #555', paddingBottom: '5px'}}>
+           <strong>🎤 Voice Debugger</strong>
+        </div>
+        <div><strong>State:</strong> {isListening ? '🟢 Listening' : '🔴 Stopped'}</div>
+        <div><strong>Raw Transcript:</strong> <span style={{color: '#81d4fa'}}>{transcript || '...'}</span></div>
+        <div><strong>Last Cmd:</strong> {processing ? 'Processing...' : 'Ready'}</div>
+        
+        {/* Diagnostic Links */}
+        <div style={{ marginTop: '10px', pointerEvents: 'auto' }}>
+            <a href="/test_mic.html" target="_blank" style={{color: '#ff80ab', textDecoration: 'underline'}}>
+                Open Mic Hardware Test
+            </a>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }

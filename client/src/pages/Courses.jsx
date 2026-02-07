@@ -52,23 +52,10 @@ export default function Courses() {
     }
   };
 
-  const handleVoiceCommand = useCallback((command) => {
-    if (command.includes("زيد حليب")) {
-      addItem("حليب", 1.400);
-    } else if (command.includes("نحّي خبز")) {
-      speak("الخاصية هذي قيد التطوير");
-    } else if (command.includes("سوم الحليب")) {
-       checkPrice("حليب");
-    } else {
-      speak("ما فهمتش، تنجم تقلي زيد حليب ولا شنوة سوم الحليب");
-    }
-  }, [items]); // Dependencies might need update if logic changes
+  // Voice command handling is now managed globally by VoiceOperator
+  // to support complex NLU commands (e.g., "زيد حليب", "قداش سوم الحليب")
+  // which might overlap with local commands.
 
-  // Register the voice handler when component mounts
-  useEffect(() => {
-    const unregister = registerPageHandler(handleVoiceCommand);
-    return unregister;
-  }, [registerPageHandler, handleVoiceCommand]);
 
   const updateQuantity = async (id, delta) => {
     const item = items.find(i => i._id === id);
