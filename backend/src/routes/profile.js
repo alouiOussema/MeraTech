@@ -13,16 +13,10 @@ const updateProfileSchema = z.object({
 router.get('/profile', requireAuth, async (req, res) => {
   try {
     const { userId } = req.auth;
-    let profile = await UserProfile.findOne({ clerkUserId: userId });
+    let profile = await UserProfile.findOne({ userId });
 
     if (!profile) {
-      // Create automatically if missing
-      // We might want to fetch name from Clerk if possible, but here we just create a placeholder or use what's provided
-      // Since we don't have access to Clerk User API here without Secret Key calls, we'll just init with "User"
-      profile = await UserProfile.create({
-        clerkUserId: userId,
-        fullName: 'مستخدم جديد', // "New User" in Arabic/Generic
-      });
+      return res.status(404).json({ error: 'Profile not found' });
     }
 
     res.json(profile);
@@ -39,9 +33,9 @@ router.post('/profile', requireAuth, async (req, res) => {
     const { fullName } = updateProfileSchema.parse(req.body);
 
     const profile = await UserProfile.findOneAndUpdate(
-      { clerkUserId: userId },
+      { userId },
       { fullName },
-      { new: true, upsert: true }
+      { new: true }
     );
 
     res.json(profile);

@@ -3,13 +3,12 @@
 ## Structure
 
 - `/client`: React Frontend (Vite + Tailwind)
-- `/backend`: Node/Express API (MongoDB + Clerk)
+- `/backend`: Node/Express API (MongoDB + JWT)
 
 ## Prerequisites
 
 - Node.js
 - MongoDB URI
-- Clerk Account (Publishable Key & Secret Key)
 
 ## Setup
 
@@ -43,14 +42,12 @@ Client runs on `http://localhost:5173`.
 ```
 PORT=4000
 MONGODB_URI=...
-CLERK_SECRET_KEY=...
-CLERK_PUBLISHABLE_KEY=...
+JWT_SECRET=dev_secret_key_123
 CLIENT_ORIGIN=http://localhost:5173
 ```
 
 ### Client (.env)
 
 ```
-VITE_CLERK_PUBLISHABLE_KEY=...
 VITE_API_URL=http://localhost:4000/api
 ```

@@ -1,11 +1,12 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from './context/AuthContext';
 import { AccessibilityProvider } from './context/AccessibilityContext';
 import { VoiceProvider } from './context/VoiceContext';
 import Layout from './layout/Layout';
 import { setupAxiosInterceptors } from './lib/api';
 import VoiceAssistant from './components/VoiceAssistant';
+import VoiceOperator from './assistant/VoiceOperator';
 import AccessibleControls from './components/AccessibleControls';
 
 // Pages
@@ -63,6 +64,7 @@ function App() {
           </Routes>
           
           {/* Global Voice Assistant UI */}
+          <VoiceOperator />
           <VoiceAssistant />
           <AccessibleControls />
           

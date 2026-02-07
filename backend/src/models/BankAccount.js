@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const BankAccountSchema = new mongoose.Schema({
-  clerkUserId: {
+  userId: {
     type: String,
     required: true,
     index: true,

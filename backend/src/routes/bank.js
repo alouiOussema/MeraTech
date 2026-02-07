@@ -13,9 +13,9 @@ const transferSchema = z.object({
 
 // Helper to get or create account
 const getAccount = async (userId) => {
-  let account = await BankAccount.findOne({ clerkUserId: userId });
+  let account = await BankAccount.findOne({ userId });
   if (!account) {
-    account = await BankAccount.create({ clerkUserId: userId });
+    account = await BankAccount.create({ userId });
   }
   return account;
 };
@@ -50,7 +50,7 @@ router.post('/bank/transfer', requireAuth, async (req, res) => {
 
     // Record Transfer
     const transfer = await Transfer.create({
-      clerkUserId: userId,
+      userId,
       toName,
       amount,
     });
@@ -73,7 +73,7 @@ router.post('/bank/transfer', requireAuth, async (req, res) => {
 router.get('/bank/transfers', requireAuth, async (req, res) => {
   try {
     const { userId } = req.auth;
-    const transfers = await Transfer.find({ clerkUserId: userId })
+    const transfers = await Transfer.find({ userId })
       .sort({ createdAt: -1 })
       .limit(20);
     res.json(transfers);

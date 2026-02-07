@@ -7,60 +7,86 @@ export const log = (type, message, data = null) => {
   console.log(`%c[Voice:${type.toUpperCase()}] ${timestamp} - ${message}`, style, data || '');
 };
 
-export const speak = (text, onEnd, onError) => {
+export const speak = (text, onEnd, onError, customRate = null) => {
   if (!window.speechSynthesis) {
     log('error', "Speech Synthesis not supported");
     return;
   }
 
-  // Cancel any ongoing speech
-  window.speechSynthesis.cancel();
+  // Helper to actually perform the speak
+  const doSpeak = () => {
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
 
-  const utterance = new SpeechSynthesisUtterance(text);
-  
-  // Try to find an Arabic voice
-  const voices = window.speechSynthesis.getVoices();
-  
-  // 1. Look for "Google" Arabic voices (usually high quality)
-  // 2. Look for any voice starting with "ar"
-  const arabicVoice = voices.find(v => v.lang.includes('ar') && v.name.includes('Google')) || 
-                      voices.find(v => v.lang.includes('ar'));
-  
-  if (arabicVoice) {
-    utterance.voice = arabicVoice;
-    // Keep the voice's native language if possible, otherwise force SA
-    utterance.lang = arabicVoice.lang; 
-  } else {
-    // Fallback if no specific voice object found, hope the browser engine handles the locale
-    utterance.lang = 'ar-SA'; 
-  }
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // Try to find an Arabic voice
+    const voices = window.speechSynthesis.getVoices();
+    
 
-  // Force ar-SA if the selected voice is generic, as ar-TN TTS is very rare
-  if (!utterance.voice || !utterance.voice.lang.includes('TN')) {
-     utterance.lang = 'ar-SA';
-  }
-
-  utterance.rate = 1.0; // Slightly faster for standard Arabic
-  utterance.pitch = 1;
-
-  utterance.onstart = () => log('info', `Speaking: "${text}"`);
-  
-  utterance.onend = () => {
-    log('info', "Finished speaking");
-    if (onEnd) onEnd();
-  };
-
-  utterance.onerror = (e) => {
-    log('error', "TTS Error", e);
-    if (e.error === 'not-allowed' && onError) {
-        onError(e);
+    const arabicVoice = 
+      voices.find(v => v.lang.includes('ar') && v.name.toLowerCase().includes('google')) || 
+      voices.find(v => v.lang.includes('ar') && v.name.toLowerCase().includes('microsoft')) ||
+      voices.find(v => v.lang.includes('ar'));
+    
+    if (arabicVoice) {
+      utterance.voice = arabicVoice;
+      utterance.lang = arabicVoice.lang; 
+      log('info', `Selected Voice: ${arabicVoice.name} (${arabicVoice.lang})`);
     } else {
-        // For other errors, just proceed to avoid getting stuck
-        if (onEnd) onEnd();
+      utterance.lang = 'ar-TN'; 
+      log('warn', "No specific Arabic voice found. Using default ar-TN.");
     }
+
+    // Slower rate for better clarity and comprehension (critical for blind users)
+    utterance.rate = customRate !== null ? customRate : 0.85;
+    utterance.pitch = 1;
+
+    utterance.onstart = () => log('info', `Speaking: "${text}"`);
+    
+    utterance.onend = () => {
+      log('info', "Finished speaking");
+      if (onEnd) onEnd();
+    };
+
+    utterance.onerror = (e) => {
+      // Ignore benign errors caused by canceling speech
+      if (e.error === 'interrupted' || e.error === 'canceled') {
+        log('info', `TTS Interrupted (${e.error})`);
+        return;
+      }
+
+      log('error', "TTS Error", e);
+      if (e.error === 'not-allowed' && onError) {
+          onError(e);
+      } else {
+          // For other errors, just proceed to avoid getting stuck
+          if (onEnd) onEnd();
+      }
+    };
+
+    window.speechSynthesis.speak(utterance);
   };
 
-  window.speechSynthesis.speak(utterance);
+  // If voices are not loaded yet, wait for them
+  if (window.speechSynthesis.getVoices().length === 0) {
+    log('info', "Voices not loaded yet, waiting for voiceschanged event...");
+    const voicesChangedHandler = () => {
+      window.speechSynthesis.removeEventListener('voiceschanged', voicesChangedHandler);
+      doSpeak();
+    };
+    window.speechSynthesis.addEventListener('voiceschanged', voicesChangedHandler);
+    
+    // Fallback if event never fires (timeout after 1s)
+    setTimeout(() => {
+        window.speechSynthesis.removeEventListener('voiceschanged', voicesChangedHandler);
+        if (window.speechSynthesis.speaking || window.speechSynthesis.pending) return; // Already started
+        // If still no voices, try anyway
+        doSpeak(); 
+    }, 1000);
+  } else {
+    doSpeak();
+  }
 };
 
 export const stopSpeaking = () => {

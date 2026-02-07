@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const UserProfileSchema = new mongoose.Schema({
-  clerkUserId: {
+  userId: {
     type: String,
     required: true,
     unique: true,
