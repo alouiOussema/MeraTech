@@ -1,0 +1,13 @@
+{
+  "name": "ibsar-automation",
+  "version": "1.0.0",
+  "description": "Automation tests for IBSAR",
+  "main": "e2e.js",
+  "scripts": {
+    "test:e2e": "node e2e.js",
+    "test:units": "node ../client/src/assistant/menus.test.js"
+  },
+  "dependencies": {
+    "puppeteer": "^24.0.0"
+  }
+}

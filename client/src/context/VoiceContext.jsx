@@ -15,6 +15,7 @@ export function VoiceProvider({ children }) {
   const [autoStartBlocked, setAutoStartBlocked] = useState(false);
   const [lastSpokenText, setLastSpokenText] = useState("");
   const [commandHandler, setCommandHandler] = useState(null);
+  const [defaultCommandHandler, setDefaultCommandHandler] = useState(null);
 
   // Use react-speech-recognition hook
   const {
@@ -63,7 +64,12 @@ export function VoiceProvider({ children }) {
 
   // Refs for state access
   const isExpectedListening = useRef(false);
+  const listeningRef = useRef(listening);
   const [isAssistantEnabled, setIsAssistantEnabled] = useState(false);
+
+  useEffect(() => {
+    listeningRef.current = listening;
+  }, [listening]);
 
   const startListeningSafe = useCallback(() => {
     isExpectedListening.current = true;
@@ -134,18 +140,18 @@ export function VoiceProvider({ children }) {
 
   // --- TTS Logic ---
 
-  const speakText = useCallback((text, onEnd) => {
+  const speakText = useCallback((text, onEnd, preventAutoRestart = false) => {
     setLastSpokenText(text);
 
     const wasListening = isExpectedListening.current;
-    if (listening) {
+    if (listeningRef.current) {
       isExpectedListening.current = false;
       SpeechRecognition.stopListening();
     }
 
     speak(text, () => {
       if (onEnd) onEnd();
-      if (wasListening) {
+      if (wasListening && !preventAutoRestart) {
         startListeningSafe();
       }
     }, (error) => {
@@ -153,12 +159,12 @@ export function VoiceProvider({ children }) {
         log('warn', "TTS Autoplay blocked. Requesting user interaction.");   
         setAutoStartBlocked(true);
       }
-      if (wasListening) {
+      if (wasListening && !preventAutoRestart) {
         startListeningSafe();
       }
       if (onEnd) onEnd();
     });
-  }, [listening, startListeningSafe]);
+  }, [startListeningSafe]);
 
   const repeatLast = useCallback(() => {
     if (lastSpokenText) {
@@ -171,9 +177,17 @@ export function VoiceProvider({ children }) {
   // --- Command Handling ---
 
   const handleCommand = async (text) => {
-    if (commandHandler) {
+    // Priority: Specific Handler (e.g. Page) > Default Handler (VoiceOperator)
+    const handler = commandHandler || defaultCommandHandler;
+    
+    if (handler) {
       setLastSpokenText(text);
-      commandHandler(text);
+      // Execute the handler
+      try {
+        await handler(text);
+      } catch (err) {
+        console.error("[VoiceContext] Handler failed:", err);
+      }
     } else {
       console.log('[VoiceContext] No handler registered for:', text);        
     }
@@ -272,6 +286,7 @@ export function VoiceProvider({ children }) {
     startListening: startListeningSafe, // Expose startListening
     repeatLast,
     setCommandHandler, // New API
+    setDefaultCommandHandler, // For VoiceOperator
     permissionStatus,
     autoStartBlocked,
     requestPermissionManual,

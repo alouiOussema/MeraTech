@@ -40,4 +40,26 @@ export const loginWithVoicePin = async (fullName, voicePin) => {
   }
 };
 
+export const fetchProducts = async (page = 1, limit = 12, category = '') => {
+  try {
+    const params = { page, limit };
+    if (category) params.category = category;
+    const response = await api.get('/products', { params });
+    return response.data;
+  } catch (error) {
+    console.error("Fetch Products Error:", error);
+    throw error;
+  }
+};
+
+export const fetchProductById = async (id) => {
+  try {
+    const response = await api.get(`/products/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Fetch Product Error:", error);
+    throw error;
+  }
+};
+
 export default api;

@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, forwardRef } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 
-export default function Input({ 
+const Input = forwardRef(({ 
   label, 
   type = 'text', 
   id, 
   error, 
   helperText, 
   ...props 
-}) {
+}, ref) => {
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === 'password';
   const inputType = isPassword ? (showPassword ? 'text' : 'password') : type;
@@ -25,6 +25,7 @@ export default function Input({
       
       <div className="relative">
         <input
+          ref={ref}
           id={id}
           type={inputType}
           className={`
@@ -64,4 +65,7 @@ export default function Input({
       )}
     </div>
   );
-}
+});
+
+Input.displayName = 'Input';
+export default Input;

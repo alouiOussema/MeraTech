@@ -1,11 +1,13 @@
 import React from 'react';
 import SkipLink from '../components/SkipLink';
 import { TopNavbar, BottomNavbar } from '../components/Navigation';
+import CartDrawer from '../components/CartDrawer';
 
 export default function Layout({ children }) {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200">
       <SkipLink />
+      <CartDrawer />
       
       <header>
         <TopNavbar />

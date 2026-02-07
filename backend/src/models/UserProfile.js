@@ -12,7 +12,20 @@ const UserProfileSchema = new mongoose.Schema({
   },
   voicePinHash: {
     type: String,
-    required: true,
+    required: false, // Optional now for Google Auth users
+  },
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
+  email: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
+  picture: {
+    type: String,
   },
 }, { timestamps: true });
 

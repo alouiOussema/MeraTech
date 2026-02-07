@@ -3,88 +3,112 @@
 // Diagnostic Logger
 export const log = (type, message, data = null) => {
   const timestamp = new Date().toLocaleTimeString();
-  const style = type === 'error' ? 'background: #fee; color: #c00' : 'background: #e6f7ff; color: #0066cc';
-  console.log(`%c[Voice:${type.toUpperCase()}] ${timestamp} - ${message}`, style, data || '');
+  const style =
+    type === "error"
+      ? "background: #fee; color: #c00"
+      : "background: #e6f7ff; color: #0066cc";
+  console.log(
+    `%c[Voice:${type.toUpperCase()}] ${timestamp} - ${message}`,
+    style,
+    data || "",
+  );
 };
 
 export const speak = (text, onEnd, onError, customRate = null) => {
   if (!window.speechSynthesis) {
-    log('error', "Speech Synthesis not supported");
+    log("error", "Speech Synthesis not supported");
     return;
   }
 
-  // Helper to actually perform the speak
   const doSpeak = () => {
-    // Cancel any ongoing speech
     window.speechSynthesis.cancel();
-
     const utterance = new SpeechSynthesisUtterance(text);
-    
-    // Try to find an Arabic voice
     const voices = window.speechSynthesis.getVoices();
-    
-    // Preference list for better quality voices
-    const arabicVoice = 
-      voices.find(v => v.lang.includes('ar') && v.name.toLowerCase().includes('google')) || // Google Arabic (Android/Chrome)
-      voices.find(v => v.lang.includes('ar') && v.name.toLowerCase().includes('hoda')) ||   // Microsoft Hoda (Windows)
-      voices.find(v => v.lang.includes('ar') && v.name.toLowerCase().includes('naayf')) ||  // Microsoft Naayf (Windows)
-      voices.find(v => v.lang.includes('ar') && v.name.toLowerCase().includes('microsoft')) || // Generic Microsoft
-      voices.find(v => v.lang.includes('ar')); // Any Arabic
-    
+    const arabicVoice =
+      voices.find(
+        (v) => v.lang.includes("ar") && v.name.toLowerCase().includes("google"),
+      ) ||
+      voices.find(
+        (v) => v.lang.includes("ar") && v.name.toLowerCase().includes("hoda"),
+      ) ||
+      voices.find(
+        (v) => v.lang.includes("ar") && v.name.toLowerCase().includes("naayf"),
+      ) ||
+      voices.find(
+        (v) =>
+          v.lang.includes("ar") && v.name.toLowerCase().includes("microsoft"),
+      ) || // Generic Microsoft
+      voices.find((v) => v.lang.includes("ar")); 
+
     if (arabicVoice) {
       utterance.voice = arabicVoice;
-      utterance.lang = arabicVoice.lang; 
-      log('info', `Selected Voice: ${arabicVoice.name} (${arabicVoice.lang})`);
+      utterance.lang = arabicVoice.lang;
+      log("info", `Selected Voice: ${arabicVoice.name} (${arabicVoice.lang})`);
     } else {
-      utterance.lang = 'ar-TN'; 
-      log('warn', "No specific Arabic voice found. Using default ar-TN.");
+      utterance.lang = "ar-TN";
+      log("warn", "No specific Arabic voice found. Using default ar-TN.");
     }
 
     // Rate optimized for naturalness (0.9 is better than 0.85 for modern voices)
     utterance.rate = customRate !== null ? customRate : 0.9;
     utterance.pitch = 1;
 
-    utterance.onstart = () => log('info', `Speaking: "${text}"`);
-    
+    utterance.onstart = () => log("info", `Speaking: "${text}"`);
+
     utterance.onend = () => {
-      log('info', "Finished speaking");
+      log("info", "Finished speaking");
       if (onEnd) onEnd();
     };
 
     utterance.onerror = (e) => {
       // Ignore benign errors caused by canceling speech
-      if (e.error === 'interrupted' || e.error === 'canceled') {
-        log('info', `TTS Interrupted (${e.error})`);
+      if (e.error === "interrupted" || e.error === "canceled") {
+        log("info", `TTS Interrupted (${e.error})`);
         return;
       }
 
-      log('error', "TTS Error", e);
-      if (e.error === 'not-allowed' && onError) {
-          onError(e);
+      log("error", "TTS Error", e);
+      if (e.error === "not-allowed" && onError) {
+        onError(e);
       } else {
-          // For other errors, just proceed to avoid getting stuck
-          if (onEnd) onEnd();
+        // For other errors, just proceed to avoid getting stuck
+        if (onEnd) onEnd();
       }
     };
 
-    window.speechSynthesis.speak(utterance);
+    try {
+      window.speechSynthesis.speak(utterance);
+    } catch (err) {
+      log("error", "SpeechSynthesis.speak failed", err);
+      if (onEnd) onEnd();
+    }
   };
 
   // If voices are not loaded yet, wait for them
   if (window.speechSynthesis.getVoices().length === 0) {
-    log('info', "Voices not loaded yet, waiting for voiceschanged event...");
+    log("info", "Voices not loaded yet, waiting for voiceschanged event...");
     const voicesChangedHandler = () => {
-      window.speechSynthesis.removeEventListener('voiceschanged', voicesChangedHandler);
+      window.speechSynthesis.removeEventListener(
+        "voiceschanged",
+        voicesChangedHandler,
+      );
       doSpeak();
     };
-    window.speechSynthesis.addEventListener('voiceschanged', voicesChangedHandler);
-    
+    window.speechSynthesis.addEventListener(
+      "voiceschanged",
+      voicesChangedHandler,
+    );
+
     // Fallback if event never fires (timeout after 1s)
     setTimeout(() => {
-        window.speechSynthesis.removeEventListener('voiceschanged', voicesChangedHandler);
-        if (window.speechSynthesis.speaking || window.speechSynthesis.pending) return; // Already started
-        // If still no voices, try anyway
-        doSpeak(); 
+      window.speechSynthesis.removeEventListener(
+        "voiceschanged",
+        voicesChangedHandler,
+      );
+      if (window.speechSynthesis.speaking || window.speechSynthesis.pending)
+        return; // Already started
+      // If still no voices, try anyway
+      doSpeak();
     }, 1000);
   } else {
     doSpeak();
@@ -94,7 +118,7 @@ export const speak = (text, onEnd, onError, customRate = null) => {
 export const stopSpeaking = () => {
   if (window.speechSynthesis) {
     window.speechSynthesis.cancel();
-    log('info', "Stopped speaking manually");
+    log("info", "Stopped speaking manually");
   }
 };
 
@@ -102,18 +126,26 @@ export const checkMicrophonePermission = async () => {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     // Stop the stream immediately, we just wanted to ask/check permission
-    stream.getTracks().forEach(track => track.stop());
-    log('info', "Microphone permission confirmed");
-    return 'granted';
+    stream.getTracks().forEach((track) => track.stop());
+    log("info", "Microphone permission confirmed");
+    return "granted";
   } catch (error) {
-    log('error', "Mic permission denied/error", error);
-    return 'denied';
+    log("error", "Mic permission denied/error", error);
+    return "denied";
   }
 };
 
 // Speech Recognition (STT)
-export const startListening = async (onResult, onError, onEnd, options = {}) => {
+export const startListening = async (
+  onResult,
+  onError,
+  onEnd,
+  options = {},
+) => {
   // Deprecated: VoiceContext now uses react-speech-recognition
-  log('warn', "voice.js startListening is deprecated. Use VoiceContext instead.");
+  log(
+    "warn",
+    "voice.js startListening is deprecated. Use VoiceContext instead.",
+  );
   return null;
 };

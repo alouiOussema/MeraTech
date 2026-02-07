@@ -54,16 +54,17 @@
       "reply": "باهي، نمشيو للبنك"
     },
     {
-      "name": "NAVIGATE_COURSES",
+      "name": "NAVIGATE_PRODUCTS",
       "action": "NAVIGATE",
-      "route": "/courses",
+      "route": "/products",
       "examples": [
-        "courses", "shopping", "store", "market",
-        "هزني للكورسة", "نحب نقضي", "السوق", "المغازة", "القضية",
+        "courses", "shopping", "store", "market", "products", "items",
+        "هزني للكورسة", "نحب نقضي", "السوق", "المغازة", "القضية", "المنتجات",
         "el 9adhya", "magasin", "supermarket", "monoprix", "mg",
-        "achats", "na9dhi", "nchri 7ajet"
+        "achats", "na9dhi", "nchri 7ajet", "نحب نشري", "نحب نشري حاجة",
+        "أريد أن أشتري شيئا", "أريد شراء", "اريد ان اشتري", "buy something"
       ],
-      "reply": "باهي، نمشيو للقضية"
+      "reply": "باهي، نمشيو للمنتجات"
     },
     {
       "name": "BANK_TRANSFER",
@@ -114,6 +115,18 @@
         { "name": "itemName", "type": "string", "required": true }
       ],
       "reply": "باهي، نشوفلك سوم {itemName}"
+    },
+    {
+      "name": "CHECKOUT",
+      "action": "API_CALL",
+      "route": "/api/cart/checkout",
+      "examples": [
+        "checkout", "buy now", "confirm order",
+        "عدي الكومند", "شريت", "كملت", "نحب نخلص", "خلص",
+        "kammalt", "adi commande", "nheb nkhales", "confirm",
+        "passer commande", "payer", "commander", "finish"
+      ],
+      "reply": "باهي، نعديو الكومند"
     },
     {
       "name": "GET_BALANCE",

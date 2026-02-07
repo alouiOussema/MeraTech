@@ -91,5 +91,41 @@ export const executors = {
     // Target the first input of the OTP group
     // Based on OtpDigitsInput: aria-label="رقم 1 من 6"
     return pasteToInput('input[aria-label="رقم 1 من 6"]', pin);
+  },
+
+  // Product Actions
+  findAndAddProduct: (productName) => {
+    if (!productName) return false;
+    
+    // Normalize query
+    const query = productName.toLowerCase().trim();
+    
+    // Strategy 1: Look for buttons with aria-label containing the name (Most reliable as we set it)
+    // The aria-label is "أضف {name} إلى السلة"
+    const buttons = Array.from(document.querySelectorAll('button[aria-label*="أضف"]'));
+    let targetBtn = buttons.find(btn => {
+      const label = btn.getAttribute('aria-label') || '';
+      return label.toLowerCase().includes(query);
+    });
+
+    // Strategy 2: If not found, look for headings and find sibling button
+    if (!targetBtn) {
+      const headings = Array.from(document.querySelectorAll('h3'));
+      const targetHeading = headings.find(h => h.innerText.toLowerCase().includes(query));
+      
+      if (targetHeading) {
+        // Traverse up to card container and find button
+        const card = targetHeading.closest('div.shadow-md'); // Assuming card class
+        if (card) {
+          targetBtn = card.querySelector('button');
+        }
+      }
+    }
+
+    if (targetBtn) {
+      targetBtn.click();
+      return true;
+    }
+    return false;
   }
 };

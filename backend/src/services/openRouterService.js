@@ -43,14 +43,14 @@ const INTENT_DEFINITIONS = {
         ],
         reply: "باهي، نمشيو للبنك"
     },
-    COURSES: {
+    PRODUCTS: {
         action: 'NAVIGATE',
-        route: '/courses',
+        route: '/products',
         keywords: [
-            'courses', 'shopping', 'achats', 'market', 'قضية', 'تسوق', 'شراء', 'store', 'magasin',
-            'marche', 'souk', 'السوق', 'المغازة', 'نقضي', 'na9dhi'
+            'products', 'shopping', 'achats', 'market', 'قضية', 'تسوق', 'شراء', 'store', 'magasin',
+            'marche', 'souk', 'السوق', 'المغازة', 'نقضي', 'na9dhi', 'نحب نشري', 'buy something', 'أريد أن أشتري'
         ],
-        reply: "باهي، نمشيو للقضية"
+        reply: "باهي، نمشيو للمنتجات"
     },
     BANK_TRANSFER: {
         action: 'API_CALL',

@@ -13,10 +13,12 @@ const updateProfileSchema = z.object({
 router.get('/profile', requireAuth, async (req, res) => {
   try {
     const { userId } = req.auth;
+    console.log('[Profile] Fetching profile for userId:', userId);
     let profile = await UserProfile.findOne({ userId });
 
     if (!profile) {
-      return res.status(404).json({ error: 'Profile not found' });
+      console.log('[Profile] Not found for userId:', userId);
+      return res.status(404).json({ error: 'Profile not found', requestedUserId: userId });
     }
 
     res.json(profile);
