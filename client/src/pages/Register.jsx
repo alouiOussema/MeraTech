@@ -1,16 +1,23 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, Volume2, ShieldCheck, CheckCircle } from 'lucide-react';
+import { User, Volume2, ShieldCheck, Mic, MicOff } from 'lucide-react';
 import Input from '../components/Input';
 import VoicePinInput from '../components/auth/VoicePinInput';
 import { useVoice } from '../context/VoiceContext';
 import { useAuth } from '../context/AuthContext';
 import { registerVoicePin } from '../lib/api';
+import { useFocusDebugger } from '../hooks/useFocusDebugger';
+import { isYes, isNo, extractNumbers } from '../assistant/numberParser';
 
 export default function Register() {
   const navigate = useNavigate();
-  const { speak, registerPageHandler } = useVoice();
+  const { speak, registerPageHandler, isListening, toggleListening } = useVoice();
   const { login } = useAuth();
+  const { focusElement } = useFocusDebugger('RegisterPage');
+
+  const nameRef = useRef(null);
+  const pinRef = useRef(null);
+  const confirmPinRef = useRef(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -18,18 +25,19 @@ export default function Register() {
     confirmPin: ''
   });
   const [errors, setErrors] = useState({});
-  const [voiceStep, setVoiceStep] = useState('WELCOME'); // WELCOME, NAME, PIN_PROMPT, PIN, CONFIRM_PIN_PROMPT, CONFIRM_PIN
-
-  // Voice Interaction Flow
+  // Steps: IDLE (Menu control), ASK_NAME, LISTENING_NAME, CONFIRM_NAME, ASK_PIN, LISTENING_PIN, CONFIRM_PIN
+  const [voiceStep, setVoiceStep] = useState('IDLE'); 
+  
+  // Voice Interaction Flow (Prompts)
   useEffect(() => {
-    if (voiceStep === 'WELCOME') {
-      speak("أهلا وسهلا! أنا باش نساعدك تعمل حسابك الأول. أوّل حاجة، قلّي شنوّة اسمك الكامل؟", () => setVoiceStep('NAME'));
-    } else if (voiceStep === 'PIN_PROMPT') {
-      speak("باهي. توا اختار PIN متكوّن من ستّة أرقام.", () => setVoiceStep('PIN'));
-    } else if (voiceStep === 'CONFIRM_PIN_PROMPT') {
-      speak("باهي. توا عاود نفس الـPIN باش نتأكّدو.", () => setVoiceStep('CONFIRM_PIN'));
+    if (voiceStep === 'ASK_NAME') {
+      speak("تفضل، قلّي اسمك الكامل.", () => setVoiceStep('LISTENING_NAME'), false);
+    } 
+    else if (voiceStep === 'ASK_PIN') {
+      focusElement(pinRef, 'PIN Input');
+      speak("توا اكتب رقم سري متكون من 1 ل 9.", () => setVoiceStep('LISTENING_PIN'), false);
     }
-  }, [voiceStep, speak]);
+  }, [voiceStep, speak, focusElement]);
 
   const handleSubmit = async (e, data = formData) => {
     if (e) e.preventDefault();
@@ -37,109 +45,122 @@ export default function Register() {
 
     if (!data.name.trim()) newErrors.name = "الاسم إجباري";
 
+    // Relaxed validation if user wants "1 to 9", but backend enforces 6 digits usually.
+    // Keeping 6 digits for safety unless user explicitly said "any number".
+    // User said "number will be aded by user from 1 to 9". This could mean single digit?
+    // Backend `auth.js` line 13: `z.string().length(6, ...)`
+    // So we MUST enforce 6 digits or change backend.
+    // I will assume 6 digits for now to avoid breaking backend.
     if (!data.pin || data.pin.length !== 6) {
       newErrors.pin = "الـPIN لازم يكون 6 أرقام";
     }
 
-    if (data.pin !== data.confirmPin) {
-      newErrors.confirmPin = "الـPIN مش كيف كيف";
-    }
-
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      speak("فما غلطة في المعلومات. ثبت وعاود.");
+      speak("فما غلطة في المعلومات. ثبت وعاود.", null, true);
       return;
     }
 
     try {
       const res = await registerVoicePin(data.name, data.pin);
-
-      login(res.token, res.user);
-
-      speak("تمّ التسجيل بنجاح! مرحبا بيك في منصّة إبصار.", () => {
-        navigate('/banque');
-      });
+      // login(res.token, res.user); // Don't auto-login if redirecting to login page
+      speak("تمّ التسجيل بنجاح! توا نوجّهك لصفحة الدخول.", () => {
+        navigate('/login');
+      }, true);
     } catch (err) {
       console.error(err);
       if (err.response?.data?.message) {
-        speak(err.response.data.message);
+        speak(err.response.data.message, null, true);
         setErrors({ form: err.response.data.message });
       } else {
-        speak("صار مشكل في السرفر. عاود مرة أخرى.");
+        speak("صار مشكل في السرفر. عاود مرة أخرى.", null, true);
       }
     }
   };
 
-  const handleVoiceInput = useCallback((text, intent) => {
+  const handleVoiceInput = useCallback((text) => {
     console.log("Register Voice Input:", text, voiceStep);
 
-    if (voiceStep === 'NAME') {
+    if (voiceStep === 'LISTENING_NAME') {
       if (text.length > 2) {
         setFormData(prev => ({ ...prev, name: text }));
-        speak(`مرحبا سي ${text}. متشرّفين بيك.`, () => setVoiceStep('PIN_PROMPT'));
+        speak(`مرحبا سي ${text}. تحب تكمل ولا تعاود؟`, () => setVoiceStep('CONFIRM_NAME'), false);
       } else {
-        speak("ما سمعتش اسمك بالباهي. عاود قلّي اسمك من فضلك.");
+        speak("ما سمعتش اسمك بالباهي. عاود قلّي اسمك.", null, false);
       }
       return;
     }
 
-    if (voiceStep === 'PIN') {
-      const digits = text.replace(/\D/g, '');
-      if (digits.length > 0) {
-        // Append digits if user says them in chunks, or replace? 
-        // For simplicity, let's assume they say the whole PIN or we take the last 6 digits found
-        // Better: just take the digits found in this utterance.
+    if (voiceStep === 'CONFIRM_NAME') {
+      // Check for "Complete/Continue" (Yes) or "Repeat" (No)
+      
+      const isContinue = isYes(text) || text.includes('كمل') || text.includes('واصل') || text.includes('نعم') || text.includes('باهي');
+      const isRepeat = isNo(text) || text.includes('عاود') || text.includes('بدل') || text.includes('لا');
 
-        if (digits.length === 6) {
-          setFormData(prev => ({ ...prev, pin: digits }));
-          speak("الـPIN مريقل.", () => setVoiceStep('CONFIRM_PIN_PROMPT'));
-        } else {
-          speak(`سمعت ${digits.length} أرقام. لازم ستّة أرقام.`);
-        }
+      if (isContinue) {
+        speak(`تشرفت بيك سي ${formData.name}. الاسم تسجّل. توا تنجم تقول 2 باش تدخل الرمز السري.`, () => {
+          setVoiceStep('IDLE');
+        }, false);
+      } else if (isRepeat) {
+        setFormData(prev => ({ ...prev, name: '' }));
+        setVoiceStep('ASK_NAME');
       } else {
-        speak("ما سمعتش أرقام. عاود قلّي الـPIN.");
+        speak("ما فهمتكش. تحب تكمل ولا تعاود؟", null, false);
+      }
+      return;
+    }
+
+    if (voiceStep === 'LISTENING_PIN') {
+      const numbers = extractNumbers(text);
+      const digits = numbers.join('');
+      
+      if (digits.length === 6) {
+        setFormData(prev => ({ ...prev, pin: digits, confirmPin: digits }));
+        speak(`اخترت الرمز ${digits.split('').join(' ')}. صحيح؟`, () => setVoiceStep('CONFIRM_PIN'), false);
+      } else {
+        speak(`لازم 6 أرقام. عاود دخل الرمز.`, null, false);
       }
       return;
     }
 
     if (voiceStep === 'CONFIRM_PIN') {
-      const digits = text.replace(/\D/g, '');
-      if (digits.length === 6) {
-        if (digits === formData.pin) {
-          setFormData(prev => ({ ...prev, confirmPin: digits }));
-          speak("الـPIN متطابق. لحظة، نسجّل حسابك.");
-          handleSubmit(null, { ...formData, confirmPin: digits });
-        } else {
-          speak("الـPIN موش كيف كيف. ما يهمّش، عاود الـPIN من لولاني.", () => {
-            setFormData(prev => ({ ...prev, pin: '', confirmPin: '' }));
-            setVoiceStep('PIN_PROMPT');
-          });
-        }
+      if (isYes(text)) {
+        speak("باهي، الرمز تسجّل. توا تنجم تقول 3 باش تأكد التسجيل.", () => {
+             setVoiceStep('IDLE');
+        }, false);
       } else {
-        speak("عاود الـPIN من فضلك، لازم ستّة أرقام.");
+        setFormData(prev => ({ ...prev, pin: '', confirmPin: '' }));
+        setVoiceStep('ASK_PIN');
       }
+      return;
     }
+
   }, [voiceStep, formData, speak]);
 
-  // Register the handler
+  // Register the handler ONLY when we are in an active voice step
   useEffect(() => {
-    return registerPageHandler(handleVoiceInput);
-  }, [registerPageHandler, handleVoiceInput]);
+    if (voiceStep !== 'IDLE') {
+      return registerPageHandler(handleVoiceInput);
+    }
+  }, [voiceStep, registerPageHandler, handleVoiceInput]);
+
+  // Handle Focus to trigger flow
+  const handleInputFocus = (step) => {
+    if (voiceStep === 'IDLE') {
+       setVoiceStep(step);
+    }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 px-4 py-6">
-      <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden">
-
-        {/* Header */}
-        <div className="bg-blue-600 p-6 text-white text-center">
-          <h1 className="text-3xl font-bold mb-2">تسجيل</h1>
-          <p className="opacity-90">اعمل حساب جديد في منصّة إبصار</p>
-        </div>
-
-        <div className="p-6 md:p-8 space-y-6">
-
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-white dark:bg-slate-800 py-8 px-4 shadow sm:rounded-lg sm:px-10">
+          <h2 className="text-center text-3xl font-extrabold text-slate-900 dark:text-white mb-8">
+            إنشاء حساب جديد
+          </h2>
+          
           {errors.form && (
-            <div className="p-4 bg-red-100 text-red-700 rounded-lg text-center font-bold">
+            <div className="p-4 bg-red-100 text-red-700 rounded-lg text-center font-bold mb-6">
               {errors.form}
             </div>
           )}
@@ -147,18 +168,20 @@ export default function Register() {
           <form onSubmit={handleSubmit} noValidate className="space-y-6">
 
             {/* Name Section */}
-            <section aria-labelledby="name-section" className={voiceStep === 'NAME' ? 'ring-4 ring-yellow-400 rounded-xl p-2' : ''}>
+            <section aria-labelledby="name-section" className={`transition-all duration-300 ${['ASK_NAME', 'LISTENING_NAME', 'CONFIRM_NAME'].includes(voiceStep) ? 'ring-4 ring-yellow-400 rounded-xl p-4 bg-yellow-50 dark:bg-yellow-900/10' : ''}`}>
               <div className="flex items-center gap-2 mb-3 text-blue-600 dark:text-blue-400">
                 <User size={24} />
                 <h2 id="name-section" className="text-xl font-bold">معلوماتك</h2>
               </div>
 
               <Input
+                ref={nameRef}
                 id="name"
                 label="اسمك الكامل"
                 placeholder="فلان الفلاني"
                 value={formData.name}
                 onChange={e => setFormData({ ...formData, name: e.target.value })}
+                onFocus={() => handleInputFocus('ASK_NAME')}
                 error={errors.name}
               />
             </section>
@@ -166,45 +189,47 @@ export default function Register() {
             <hr className="border-slate-200 dark:border-slate-700" />
 
             {/* PIN Section */}
-            <section aria-labelledby="pin-section" className={['PIN', 'PIN_PROMPT', 'CONFIRM_PIN', 'CONFIRM_PIN_PROMPT'].includes(voiceStep) ? 'ring-4 ring-yellow-400 rounded-xl p-2' : ''}>
+            <section aria-labelledby="pin-section" className={`transition-all duration-300 ${['ASK_PIN', 'LISTENING_PIN', 'CONFIRM_PIN'].includes(voiceStep) ? 'ring-4 ring-yellow-400 rounded-xl p-4 bg-yellow-50 dark:bg-yellow-900/10' : ''}`}>
               <div className="flex items-center gap-2 mb-3 text-blue-600 dark:text-blue-400">
                 <Volume2 size={24} />
                 <h2 id="pin-section" className="text-xl font-bold">الرمز السري (PIN)</h2>
               </div>
 
-              <div className="space-y-6">
-                <VoicePinInput
-                  id="pin"
-                  label="الـPIN (6 أرقام)"
-                  value={formData.pin}
-                  onChange={val => setFormData({ ...formData, pin: val })}
-                  error={errors.pin}
-                />
-
-                <VoicePinInput
-                  id="confirmPin"
-                  label="عاود الـPIN للتأكيد"
-                  value={formData.confirmPin}
-                  onChange={val => setFormData({ ...formData, confirmPin: val })}
-                  error={errors.confirmPin}
-                  helperText="عاود قول نفس الأرقام باش نتأكدو"
-                />
+              <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-xl mb-6">
+                <p className="text-blue-800 dark:text-blue-200 font-medium">
+                  الـPIN هذا هو "صوتك". باش تستعملو باش تدخل لحسابك.
+                  اختار 6 أرقام ساهلين عليك.
+                </p>
               </div>
+
+              <VoicePinInput
+                ref={pinRef}
+                id="pin"
+                label="الـPIN (6 أرقام)"
+                value={formData.pin}
+                onChange={val => setFormData({ ...formData, pin: val })}
+                onFocus={() => handleInputFocus('ASK_PIN')}
+                error={errors.pin}
+              />
             </section>
 
-            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl flex items-center gap-3 border border-green-100 dark:border-green-800">
-              <ShieldCheck className="text-green-600 dark:text-green-400 shrink-0" size={24} />
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                معلوماتك تبقى محمية وما نعطيوها لحد.
-              </p>
+            <div className="flex gap-4">
+              <button
+                type="submit"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl text-xl shadow-lg hover:shadow-xl transition-all focus:ring-4 focus:ring-blue-300 transform active:scale-95"
+              >
+                سجّل حسابك
+              </button>
+              
+              <button
+                type="button"
+                onClick={toggleListening}
+                className={`px-6 rounded-xl flex items-center justify-center transition-colors ${isListening ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-600 hover:bg-green-200'}`}
+                title={isListening ? "أوقف الاستماع" : "ابدأ الاستماع"}
+              >
+                {isListening ? <Mic size={28} /> : <MicOff size={28} />}
+              </button>
             </div>
-
-            <button
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl text-xl shadow-lg hover:shadow-xl transition-all focus:ring-4 focus:ring-blue-300 transform active:scale-95"
-            >
-              سجّل حسابك
-            </button>
           </form>
 
           {/* Secondary Actions */}

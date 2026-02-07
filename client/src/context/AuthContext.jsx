@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import axios from 'axios';
 
 const AuthContext = createContext(null);
 
@@ -9,18 +10,38 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     // Load from localStorage on mount
-    const storedToken = localStorage.getItem('auth_token');
-    const storedUser = localStorage.getItem('auth_user');
+    const initAuth = async () => {
+      const storedToken = localStorage.getItem('auth_token');
+      const storedUser = localStorage.getItem('auth_user');
 
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        console.error("Failed to parse user", e);
+      if (storedToken && storedUser) {
+        setToken(storedToken);
+        try {
+          setUser(JSON.parse(storedUser));
+          
+          // Verify token validity with backend
+          try {
+             await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:4000/api'}/profile`, {
+               headers: { Authorization: `Bearer ${storedToken}` }
+             });
+             // Token is valid
+          } catch (err) {
+            console.error("Token verification failed:", err);
+            // Token invalid or expired - logout
+            setToken(null);
+            setUser(null);
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_user');
+          }
+
+        } catch (e) {
+          console.error("Failed to parse user", e);
+        }
       }
-    }
-    setLoading(false);
+      setLoading(false);
+    };
+
+    initAuth();
   }, []);
 
   const login = (newToken, newUser) => {

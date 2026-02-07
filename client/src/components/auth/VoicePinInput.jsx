@@ -1,14 +1,14 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import OtpDigitsInput from './OtpDigitsInput';
 
-export default function VoicePinInput({ 
+const VoicePinInput = forwardRef(({ 
   id, 
   label, 
   value, 
   onChange, 
   error, 
   helperText 
-}) {
+}, ref) => {
   return (
     <div className="space-y-2">
       <label id={`${id}-label`} htmlFor={id} className="block text-lg font-bold text-slate-800 dark:text-white">
@@ -18,6 +18,7 @@ export default function VoicePinInput({
       {/* Simplified PIN Input Area - No Mic */}
       <div className="relative pt-1">
         <OtpDigitsInput 
+          ref={ref}
           value={value} 
           onChange={onChange} 
           labelId={`${id}-label`}
@@ -38,4 +39,7 @@ export default function VoicePinInput({
       )}
     </div>
   );
-}
+});
+
+VoicePinInput.displayName = 'VoicePinInput';
+export default VoicePinInput;

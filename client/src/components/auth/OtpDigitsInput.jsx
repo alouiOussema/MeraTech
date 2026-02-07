@@ -1,12 +1,26 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 
-export default function OtpDigitsInput({ value, onChange, labelId, error }) {
+const OtpDigitsInput = forwardRef(({ value, onChange, labelId, error }, ref) => {
   const inputsRef = useRef([]);
 
   // Ensure inputsRef has correct length
   if (inputsRef.current.length !== 6) {
     inputsRef.current = new Array(6).fill(null);
   }
+
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      // Focus first empty input or the last one if full, or just the first one?
+      // Usually first empty is best.
+      // value is a string, e.g. "123"
+      const len = value ? value.length : 0;
+      const targetIndex = Math.min(len, 5);
+      const target = inputsRef.current[targetIndex];
+      if (target) {
+        target.focus();
+      }
+    }
+  }));
 
   const handleChange = (index, e) => {
     const val = e.target.value;
@@ -82,4 +96,7 @@ export default function OtpDigitsInput({ value, onChange, labelId, error }) {
       ))}
     </div>
   );
-}
+});
+
+OtpDigitsInput.displayName = 'OtpDigitsInput';
+export default OtpDigitsInput;

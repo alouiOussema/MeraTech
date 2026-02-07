@@ -3,16 +3,15 @@ const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key_123';
 
 const requireAuth = (req, res, next) => {
-  // FORCE BYPASS for now (Unconditional Guest User)
-  // This allows the app to work even if an invalid token is sent
-  req.user = { userId: 'guest_user_123', name: 'Guest' };
-  req.auth = { userId: 'guest_user_123' };
-  return next();
-
-  /*
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // If no token, maybe allow guest? For now, strict auth for profile.
+    // return res.status(401).json({ error: 'Unauthenticated' });
+    
+    // Fallback to guest for dev if needed, BUT for profile we need real user.
+    // If we want to support both, we check token first.
+    // For this task (Profile), we need the real user.
     return res.status(401).json({ error: 'Unauthenticated' });
   }
 
@@ -27,7 +26,6 @@ const requireAuth = (req, res, next) => {
     console.error('JWT Error:', error.message);
     return res.status(401).json({ error: 'Invalid Token' });
   }
-  */
 };
 
 const logUser = (req, res, next) => {

@@ -27,10 +27,12 @@ const generateToken = (userId) => {
 router.post('/register', async (req, res) => {
   try {
     const { fullName, voicePin } = registerSchema.parse(req.body);
+    console.log(`[Register] Attempting to register: ${fullName}`);
 
     // Check if profile exists (by Name for simplicity in this demo)
     const existingUser = await UserProfile.findOne({ fullName });
     if (existingUser) {
+      console.log(`[Register] User already exists: ${fullName}`);
       return res.status(409).json({ error: "USER_EXISTS", message: "هذا اليوزر موجود قبل" });
     }
 
@@ -42,11 +44,15 @@ router.post('/register', async (req, res) => {
     // Generate a local userId (using Mongoose ObjectId string or custom)
     const userId = new mongoose.Types.ObjectId().toString();
 
+    console.log(`[Register] Creating user with userId: ${userId}`);
+
     const user = await UserProfile.create({
       userId,
       fullName,
       voicePinHash
     });
+
+    console.log(`[Register] User created successfully: ${user.fullName} (${user._id})`);
 
     const token = generateToken(user.userId);
 
