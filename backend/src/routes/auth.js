@@ -1,9 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
+const mongoose = require('mongoose');
 const { z } = require('zod');
+const jwt = require('jsonwebtoken');
 const UserProfile = require('../models/UserProfile');
-const { requireAuth } = require('@clerk/clerk-sdk-node');
+const { JWT_SECRET } = require('../middleware/auth');
 
 // Validation schemas
 const registerSchema = z.object({
@@ -12,22 +14,22 @@ const registerSchema = z.object({
 });
 
 const loginSchema = z.object({
+  fullName: z.string().min(1, "الاسم لازم يكون موجود"), // Added fullName for identification
   voicePin: z.string().length(6, "الـPIN لازم يكون 6 أرقام")
 });
 
-// Register new profile (Public for demo)
+// Helper to generate Token
+const generateToken = (userId) => {
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '30d' });
+};
+
+// Register new profile
 router.post('/register', async (req, res) => {
   try {
-    // For demo, we might not have a Clerk ID if strictly voice-only without Clerk UI
-    // We'll generate one or use provided
-    let userId = req.body.clerkUserId;
-    if (!userId && req.auth) userId = req.auth.userId;
-    if (!userId) userId = `demo_${Date.now()}`; 
-
     const { fullName, voicePin } = registerSchema.parse(req.body);
 
-    // Check if profile exists
-    const existingUser = await UserProfile.findOne({ clerkUserId: userId });
+    // Check if profile exists (by Name for simplicity in this demo)
+    const existingUser = await UserProfile.findOne({ fullName });
     if (existingUser) {
       return res.status(409).json({ error: "USER_EXISTS", message: "هذا اليوزر موجود قبل" });
     }
@@ -37,47 +39,41 @@ router.post('/register', async (req, res) => {
     const voicePinHash = await bcrypt.hash(voicePin, salt);
 
     // Create Profile
+    // Generate a local userId (using Mongoose ObjectId string or custom)
+    const userId = new mongoose.Types.ObjectId().toString();
+
     const user = await UserProfile.create({
-      clerkUserId: userId,
+      userId,
       fullName,
       voicePinHash
     });
 
-    res.status(201).json({ ok: true, user });
+    const token = generateToken(user.userId);
+
+    res.json({ 
+      success: true, 
+      token,
+      user: { userId: user.userId, fullName: user.fullName }
+    });
+
   } catch (error) {
-    console.error("Register Error:", error);
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: "VALIDATION_ERROR", message: error.errors[0].message });
+      return res.status(400).json({ error: error.errors });
     }
-    res.status(500).json({ error: "SERVER_ERROR", message: "صار مشكل في السرفر" });
+    console.error("Register Error:", error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Voice PIN Verification (Public for demo)
+// Login (Voice Login)
 router.post('/voice-login', async (req, res) => {
   try {
-    // For demo, we need to find user by something. Name? 
-    // Or just check if ANY user has this PIN? (Insecure but OK for demo)
-    // Or we expect clerkUserId in body
-    let userId = req.body.clerkUserId;
-    if (!userId && req.auth) userId = req.auth.userId;
-    
-    // If no userId, we can't really login securely. 
-    // Let's assume we pass the name in body for the demo lookup?
-    // Or just skip this check if we can't identify.
-    // Let's fallback to finding by name if provided, else error.
-    
-    const { voicePin } = loginSchema.parse(req.body);
-    let user;
+    // We expect fullName + PIN now since we don't have Clerk session
+    const { fullName, voicePin } = loginSchema.parse(req.body);
 
-    if (userId) {
-       user = await UserProfile.findOne({ clerkUserId: userId });
-    } else if (req.body.name) {
-       user = await UserProfile.findOne({ fullName: req.body.name });
-    }
-
+    const user = await UserProfile.findOne({ fullName });
     if (!user) {
-      return res.status(404).json({ error: "USER_NOT_FOUND", message: "اليوزر هذا موش موجود" });
+      return res.status(404).json({ error: "USER_NOT_FOUND", message: "ما لقيتش حساب بهذا الاسم" });
     }
 
     const isMatch = await bcrypt.compare(voicePin, user.voicePinHash);
@@ -85,13 +81,20 @@ router.post('/voice-login', async (req, res) => {
       return res.status(401).json({ error: "INVALID_PIN", message: "الـPIN غالط" });
     }
 
-    res.json({ ok: true, message: "مرحبا بيك" });
+    const token = generateToken(user.userId);
+
+    res.json({ 
+      success: true, 
+      token,
+      user: { userId: user.userId, fullName: user.fullName }
+    });
+
   } catch (error) {
-    console.error("Voice Login Error:", error);
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: "VALIDATION_ERROR", message: error.errors[0].message });
+      return res.status(400).json({ error: error.errors });
     }
-    res.status(500).json({ error: "SERVER_ERROR", message: "صار مشكل في السرفر" });
+    console.error("Login Error:", error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

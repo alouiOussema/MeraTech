@@ -12,9 +12,9 @@ const itemSchema = z.object({
 
 // Helper
 const getList = async (userId) => {
-  let list = await ShoppingList.findOne({ clerkUserId: userId });
+  let list = await ShoppingList.findOne({ userId });
   if (!list) {
-    list = await ShoppingList.create({ clerkUserId: userId });
+    list = await ShoppingList.create({ userId });
   }
   return list;
 };
@@ -74,11 +74,11 @@ router.patch('/courses/items/:itemId', requireAuth, async (req, res) => {
     const list = await getList(userId);
     const item = list.items.id(itemId);
     
-    if (!item) return res.status(404).json({ error: 'Item not found' });
-    
-    item.qty = qty;
-    await list.save();
-    
+    if (item) {
+      item.qty = qty;
+      await list.save();
+    }
+
     res.json(list);
   } catch (error) {
     console.error(error);
@@ -95,7 +95,7 @@ router.delete('/courses/items/:itemId', requireAuth, async (req, res) => {
     const list = await getList(userId);
     list.items.pull(itemId);
     await list.save();
-    
+
     res.json(list);
   } catch (error) {
     console.error(error);
@@ -109,15 +109,9 @@ router.get('/courses/total', requireAuth, async (req, res) => {
     const { userId } = req.auth;
     const list = await getList(userId);
     
-    let total = 0;
-    for (const item of list.items) {
-      // Use stored price or fetch fresh? User said "item.price (or catalog price) * qty"
-      // We used stored price on add. Let's use that for simplicity, or refresh it.
-      // Let's stick to stored price.
-      total += (item.price || 0) * item.qty;
-    }
+    const total = list.items.reduce((sum, item) => sum + (item.price * item.qty), 0);
     
-    res.json({ total, currency: 'TND' });
+    res.json({ total });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });

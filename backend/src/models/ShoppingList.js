@@ -8,7 +8,7 @@ const ShoppingItemSchema = new mongoose.Schema({
 });
 
 const ShoppingListSchema = new mongoose.Schema({
-  clerkUserId: {
+  userId: {
     type: String,
     required: true,
     index: true,

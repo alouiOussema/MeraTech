@@ -5,6 +5,7 @@ import { Mic, MicOff, Volume2, VolumeX, RotateCcw, Keyboard, HelpCircle } from '
 export default function VoiceAssistant() {
   const { 
     isListening, 
+    isAssistantEnabled, // Use persistent state for UI
     toggleListening, 
     transcript, 
     interimTranscript,
@@ -91,20 +92,23 @@ export default function VoiceAssistant() {
             {/* Status Card */}
             <div className={`
                 transition-all duration-300 transform 
-                ${isListening ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'}
+                ${isAssistantEnabled ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'}
                 bg-slate-900/90 backdrop-blur-md text-white rounded-t-3xl p-6 shadow-2xl border-t border-x border-white/10
             `}>
                 <div className="flex items-center justify-center gap-4 mb-4">
-                    <div className="animate-pulse bg-red-500 rounded-full p-3">
-                        <Mic size={32} />
+                    <div className={`
+                        rounded-full p-3 transition-colors duration-300
+                        ${isListening ? 'bg-red-500 animate-pulse' : 'bg-blue-500'}
+                    `}>
+                        {isListening ? <Mic size={32} /> : <Volume2 size={32} />}
                     </div>
                     <h2 className="text-2xl font-bold">
-                        نسمع فيك...
+                        {isListening ? "نسمع فيك..." : "نتكلّم..."}
                     </h2>
                 </div>
                 
                 <div className="text-center min-h-[3rem] text-xl text-blue-200 font-medium">
-                    {interimTranscript || transcript || "تكلّم..."}
+                    {interimTranscript || transcript || (isListening ? "تكلّم..." : "")}
                 </div>
             </div>
 
@@ -115,14 +119,14 @@ export default function VoiceAssistant() {
                     onClick={toggleListening}
                     className={`
                         flex-1 flex flex-col items-center justify-center gap-1 p-3 rounded-xl transition-colors
-                        ${isListening 
+                        ${isAssistantEnabled 
                             ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' 
                             : 'bg-blue-600 text-white hover:bg-blue-700'}
                     `}
                     title="تحكم في الميكروفون (Space)"
                 >
-                    {isListening ? <Mic size={24} /> : <MicOff size={24} />}
-                    <span className="text-sm font-bold">{isListening ? "وقّف" : "تكلّم"}</span>
+                    {isAssistantEnabled ? <Mic size={24} /> : <MicOff size={24} />}
+                    <span className="text-sm font-bold">{isAssistantEnabled ? "وقّف" : "تكلّم"}</span>
                 </button>
 
                 <button
