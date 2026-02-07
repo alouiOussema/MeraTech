@@ -1,0 +1,146 @@
+{
+  "meta": {
+    "name": "Tunisian Dialect NLU Model",
+    "version": "1.0.0",
+    "description": "Comprehensive intent recognition for Tunisian Arabic/French code-switching"
+  },
+  "intents": [
+    {
+      "name": "NAVIGATE_HOME",
+      "action": "NAVIGATE",
+      "route": "/",
+      "examples": [
+        "home", "dar", "accueil", "menu", "principal", "main",
+        "رجعني للدار", "نحب نرجع للباج لولة", "هزني للصفحة الرئيسية",
+        "رجّعني وين كنت", "الرئيسية يعيشك", "accueil brabi",
+        "رجعني للبداية", "page d'accueil", "go home"
+      ],
+      "reply": "باهي، نرجعو للرئيسية"
+    },
+    {
+      "name": "NAVIGATE_LOGIN",
+      "action": "NAVIGATE",
+      "route": "/login",
+      "examples": [
+        "login", "connexion", "connect", "signin", "log in",
+        "نحب ندخل", "تسجيل الدخول", "كونكسيون", "حل الكونت",
+        "ادخل لحسابي", "connecter", "se connecter", "connectini",
+        "nheb nconnecti", "3andi compte"
+      ],
+      "reply": "باهي، نمشيو لصفحة الدخول"
+    },
+    {
+      "name": "NAVIGATE_REGISTER",
+      "action": "NAVIGATE",
+      "route": "/register",
+      "examples": [
+        "register", "signup", "create account", "new account",
+        "نحب نسجل", "عمل حساب جديد", "نعمل كونط", "حل كونت",
+        "compte jdid", "nouveau compte", "inscrire", "inscription",
+        "ma 3andich compte", "nheb n9ayed", "create profile"
+      ],
+      "reply": "باهي، نعملو حساب جديد"
+    },
+    {
+      "name": "NAVIGATE_BANK",
+      "action": "NAVIGATE",
+      "route": "/bank",
+      "examples": [
+        "bank", "banque", "account", "money",
+        "هزني للبنك", "البنك", "حسابي البنكي", "نحب نشوف فلوسي",
+        "el banka", "lbanque", "hezni lbanque", "win flousi",
+        "omouri lmadia", "my bank", "mon compte"
+      ],
+      "reply": "باهي، نمشيو للبنك"
+    },
+    {
+      "name": "NAVIGATE_COURSES",
+      "action": "NAVIGATE",
+      "route": "/courses",
+      "examples": [
+        "courses", "shopping", "store", "market",
+        "هزني للكورسة", "نحب نقضي", "السوق", "المغازة", "القضية",
+        "el 9adhya", "magasin", "supermarket", "monoprix", "mg",
+        "achats", "na9dhi", "nchri 7ajet"
+      ],
+      "reply": "باهي، نمشيو للقضية"
+    },
+    {
+      "name": "BANK_TRANSFER",
+      "action": "API_CALL",
+      "route": "/api/bank/transfer",
+      "examples": [
+        "transfer", "virement", "send money",
+        "نحب نبعث فلوس", "صب ل", "حول ل", "ابعث ل", "فيرمون",
+        "ab3ath", "hawel", "versi", "sablou", "envoyer argent",
+        "transferer", "virementbancaire", "ab3ath flous",
+        "b3athli", "b3ath", "viri", "sab", "versement", "verse",
+        "hawelli", "hawl", "send", "envoyer"
+      ],
+      "slots": [
+        { "name": "amount", "type": "number", "required": true },
+        { "name": "toName", "type": "person", "required": true }
+      ],
+      "reply": "باهي، باش نحول {amount} لـ {toName}"
+    },
+    {
+      "name": "ADD_ITEM",
+      "action": "API_CALL",
+      "route": "/api/cart/add",
+      "examples": [
+        "add", "buy", "get",
+        "زيد", "شري", "نحب نشري", "زيدني", "حط في القفة",
+        "zid", "chri", "achete", "ajout", "jib", "jeb",
+        "nheb 3la", "zidni", "hot", "ajouter au panier",
+        "ichri", "echri", "n7eb nechri", "jibuli", "hat", "hott",
+        "3abbi", "3abbili", "nheb nekhou", "khuth", "khoudh"
+      ],
+      "slots": [
+        { "name": "itemName", "type": "string", "required": true },
+        { "name": "qty", "type": "number", "required": false }
+      ],
+      "reply": "باهي، نزيدو {qty} {itemName}"
+    },
+    {
+      "name": "CHECK_PRICE",
+      "action": "API_CALL",
+      "route": "/api/products/price",
+      "examples": [
+        "price", "cost", "how much",
+        "بقداش", "قداش سوم", "سوم", "السوم", "bgadech",
+        "soum", "prix", "combien coute", "kadech", "b9adeh"
+      ],
+      "slots": [
+        { "name": "itemName", "type": "string", "required": true }
+      ],
+      "reply": "باهي، نشوفلك سوم {itemName}"
+    },
+    {
+      "name": "GET_BALANCE",
+      "action": "API_CALL",
+      "route": "/api/bank/balance",
+      "examples": [
+        "balance", "funds", "how much money",
+        "قداش عندي فلوس", "رصيدي", "الرصيد", "فلوسي", "قداش في الكونط",
+        "solde", "flousi", "mon solde", "kadech 3andi", "compte fih",
+        "el 7seb", "b9adeh fih", "rside"
+      ],
+      "reply": "باهي، نشوفلك الرصيد"
+    },
+    {
+      "name": "HELP",
+      "action": "UNKNOWN",
+      "route": null,
+      "examples": [
+        "help", "aide", "sos",
+        "عاوني", "شنوة نجم نعمل", "مساعدة", "كيفاش",
+        "chnowa na3mel", "kifech", "help me", "aidez moi"
+      ],
+      "reply": "أنا هنا باش نعاونك. تنجم تقولي وين تحب تمشي ولا شنوة تحب تعمل"
+    }
+  ],
+  "entities": {
+    "person": ["sara", "ahmed", "mohamed", "ali", "imen", "walid", "karim", "rym", "salma"],
+    "product": ["hlib", "khobz", "ma", "lait", "pain", "eau", "tomate", "pates", "makarouna", "couscous"]
+  }
+}

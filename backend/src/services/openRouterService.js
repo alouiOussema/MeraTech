@@ -10,55 +10,82 @@ const INTENT_DEFINITIONS = {
     HOME: {
         action: 'NAVIGATE',
         route: '/',
-        keywords: ['home', 'dar', 'accueil', 'الرئيسية', 'رجعني', 'بداية', 'main'],
+        keywords: [
+            'home', 'dar', 'accueil', 'الرئيسية', 'رجعني', 'بداية', 'main', 'menu', 'principal',
+            'هزني للدار', 'ارجع', 'الصفحة الاولى', 'page d\'accueil'
+        ],
         reply: "باهي، نرجعو للرئيسية"
     },
     LOGIN: {
         action: 'NAVIGATE',
         route: '/login',
-        keywords: ['login', 'connexion', 'signin', 'دخول', 'نسجل دخول', 'log in', 'connecter', 'ندخل', 'connect'],
+        keywords: [
+            'login', 'connexion', 'signin', 'دخول', 'نسجل دخول', 'log in', 'connecter', 'ندخل', 'connect',
+            'compte', 'identifiant', 'تسجيل الدخول', 'ادخل'
+        ],
         reply: "باهي، نمشيو لصفحة الدخول"
     },
     REGISTER: {
         action: 'NAVIGATE',
         route: '/register',
-        keywords: ['register', 'signup', 'compte', 'حساب', 'تسجيل', 'nouveau', 'new', 'انشاء', 'create'],
+        keywords: [
+            'register', 'signup', 'compte', 'حساب', 'تسجيل', 'nouveau', 'new', 'انشاء', 'create',
+            'حل كونط', 'نعمل كونط', 'حساب جديد', 'inscrire', 'inscription'
+        ],
         reply: "باهي، نعملو حساب جديد"
     },
     BANK: {
         action: 'NAVIGATE',
         route: '/bank',
-        keywords: ['bank', 'banque', 'compte bancaire', 'بنك', 'البنك'],
+        keywords: [
+            'bank', 'banque', 'compte bancaire', 'بنك', 'البنك', 'rside', 'solde', 'flousi', 'argent',
+            'هزني للبنك', 'الكونط', 'حسابي البنكي', 'el banka', 'lbanque'
+        ],
         reply: "باهي، نمشيو للبنك"
     },
     COURSES: {
         action: 'NAVIGATE',
         route: '/courses',
-        keywords: ['courses', 'shopping', 'achats', 'market', 'قضية', 'تسوق', 'شراء', 'store', 'magasin'],
+        keywords: [
+            'courses', 'shopping', 'achats', 'market', 'قضية', 'تسوق', 'شراء', 'store', 'magasin',
+            'marche', 'souk', 'السوق', 'المغازة', 'نقضي', 'na9dhi'
+        ],
         reply: "باهي، نمشيو للقضية"
     },
     BANK_TRANSFER: {
         action: 'API_CALL',
         route: '/api/bank/transfer',
-        keywords: ['transfer', 'virement', 'verser', 'envoyer', 'hawel', 'baath', 'ab3ath', 'حول', 'إرسال', 'ابعث'],
+        keywords: [
+            'transfer', 'virement', 'verser', 'envoyer', 'hawel', 'baath', 'ab3ath', 'حول', 'إرسال', 'ابعث',
+            'versilou', 'sablou', 'صب ل', 'بعث ل'
+        ],
         reply: (slots) => `باهي، باش نحول ${slots.amount || 'فلوس'} لـ ${slots.toName || 'شخص'}`
     },
     ADD_ITEM: {
         action: 'API_CALL',
         route: '/api/cart/add',
-        keywords: ['add', 'ajouter', 'zid', 'chri', 'achete', 'زيد', 'شري', 'اضافة', 'nheb'],
+        keywords: [
+            'add', 'ajouter', 'zid', 'chri', 'achete', 'زيد', 'شري', 'اضافة', 'nheb',
+            'hot', 'hott', 'jib', 'jeb', 'جيب', 'حط'
+        ],
         reply: (slots) => `باهي، نزيدو ${slots.qty ? slots.qty + ' ' : ''}${slots.itemName || 'حاجة'}`
     },
     CHECK_PRICE: {
         action: 'API_CALL',
         route: '/api/products/price',
-        keywords: ['price', 'prix', 'soum', 'kadech', 'combien', 'سوم', 'قداش', 'سعر'],
+        keywords: [
+            'price', 'prix', 'soum', 'kadech', 'combien', 'سوم', 'قداش', 'سعر',
+            'b9adeh', 'bgadech', 'بقداش'
+        ],
         reply: (slots) => `باهي، نشوفلك سوم ${slots.itemName || 'هذا'}`
     },
     GET_BALANCE: {
         action: 'API_CALL',
         route: '/api/bank/balance',
-        keywords: ['balance', 'solde', 'flousi', 'rside', 'رصيدي', 'فلوسي', 'flouss'],
+        keywords: [
+            'balance', 'solde', 'flousi', 'rside', 'رصيدي', 'فلوسي', 'flouss',
+            'kadech 3andi', 'solde mte3i', 'compte fih', 'الرصيد'
+        ],
         reply: "باهي، نشوفلك الرصيد"
     },
     HELP: {

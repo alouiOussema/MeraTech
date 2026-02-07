@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useVoice } from '../context/VoiceContext';
-import { Mic, MicOff, Volume2, VolumeX, RotateCcw, Keyboard, HelpCircle } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, RotateCcw, Keyboard, HelpCircle, WifiOff, AlertTriangle } from 'lucide-react';
 
 export default function VoiceAssistant() {
   const { 
@@ -14,8 +14,24 @@ export default function VoiceAssistant() {
     repeatLast,
     permissionStatus,
     autoStartBlocked,
-    requestPermissionManual
+    requestPermissionManual,
+    error, // Import error
+    isMicrophoneAvailable,
+    browserSupportsSpeechRecognition
   } = useVoice();
+
+  const [isOnline, setIsOnline] = React.useState(navigator.onLine);
+
+  useEffect(() => {
+    const setOnline = () => setIsOnline(true);
+    const setOffline = () => setIsOnline(false);
+    window.addEventListener('online', setOnline);
+    window.addEventListener('offline', setOffline);
+    return () => {
+      window.removeEventListener('online', setOnline);
+      window.removeEventListener('offline', setOffline);
+    };
+  }, []);
 
   const [showKeyboard, setShowKeyboard] = React.useState(false);
   const [textInput, setTextInput] = React.useState("");
@@ -108,7 +124,28 @@ export default function VoiceAssistant() {
                 </div>
                 
                 <div className="text-center min-h-[3rem] text-xl text-blue-200 font-medium">
-                    {interimTranscript || transcript || (isListening ? "تكلّم..." : "")}
+                    {!isOnline ? (
+                        <span className="text-red-400 font-bold flex items-center justify-center gap-2">
+                             <WifiOff size={24} />
+                             مشكل في الإنترنت
+                        </span>
+                    ) : !browserSupportsSpeechRecognition ? (
+                        <span className="text-red-400 font-bold flex items-center justify-center gap-2">
+                             <AlertTriangle size={24} />
+                             المتصفح هذا ما يدعمش الصوت
+                        </span>
+                    ) : !isMicrophoneAvailable ? (
+                        <span className="text-red-400 font-bold flex items-center justify-center gap-2">
+                             <MicOff size={24} />
+                             الميكروفون مش موجود
+                        </span>
+                    ) : error ? (
+                        <span className="text-red-400 font-bold">
+                             مشكل: {error.message || "فمّا مشكلة في الصوت"}
+                        </span>
+                    ) : (
+                        interimTranscript || transcript || (isListening ? "تكلّم..." : "")
+                    )}
                 </div>
             </div>
 
