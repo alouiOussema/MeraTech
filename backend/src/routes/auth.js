@@ -4,7 +4,8 @@ const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const { z } = require('zod');
 const jwt = require('jsonwebtoken');
-const UserProfile = require('../models/UserProfile');
+const User = require('../models/User');
+const BankAccount = require('../models/BankAccount');
 const { JWT_SECRET } = require('../middleware/auth');
 
 // Validation schemas
@@ -14,7 +15,7 @@ const registerSchema = z.object({
 });
 
 const loginSchema = z.object({
-  fullName: z.string().min(1, "الاسم لازم يكون موجود"), // Added fullName for identification
+  fullName: z.string().min(1, "الاسم لازم يكون موجود"),
   voicePin: z.string().length(6, "الـPIN لازم يكون 6 أرقام")
 });
 
@@ -29,8 +30,8 @@ router.post('/register', async (req, res) => {
     const { fullName, voicePin } = registerSchema.parse(req.body);
     console.log(`[Register] Attempting to register: ${fullName}`);
 
-    // Check if profile exists (by Name for simplicity in this demo)
-    const existingUser = await UserProfile.findOne({ fullName });
+    // Check if user exists
+    const existingUser = await User.findOne({ name: fullName });
     if (existingUser) {
       console.log(`[Register] User already exists: ${fullName}`);
       return res.status(409).json({ error: "USER_EXISTS", message: "هذا اليوزر موجود قبل" });
@@ -38,28 +39,39 @@ router.post('/register', async (req, res) => {
 
     // Hash PIN
     const salt = await bcrypt.genSalt(10);
-    const voicePinHash = await bcrypt.hash(voicePin, salt);
+    const pinHash = await bcrypt.hash(voicePin, salt);
 
-    // Create Profile
-    // Generate a local userId (using Mongoose ObjectId string or custom)
-    const userId = new mongoose.Types.ObjectId().toString();
-
-    console.log(`[Register] Creating user with userId: ${userId}`);
-
-    const user = await UserProfile.create({
-      userId,
-      fullName,
-      voicePinHash
+    // Create User (without bankAccountId first)
+    // We use a transaction or just sequential saves. Sequential is fine for now.
+    
+    // 1. Create User
+    const user = new User({
+      name: fullName,
+      pinHash
     });
+    
+    // Save user to get _id
+    await user.save();
+    console.log(`[Register] User saved with ID: ${user._id}`);
 
-    console.log(`[Register] User created successfully: ${user.fullName} (${user._id})`);
+    // 2. Create BankAccount
+    const bankAccount = await BankAccount.create({
+      userId: user._id,
+      balance: 200, // Default 200 TND
+      currency: 'TND'
+    });
+    console.log(`[Register] BankAccount created with ID: ${bankAccount._id}`);
 
-    const token = generateToken(user.userId);
+    // 3. Update User with bankAccountId
+    user.bankAccountId = bankAccount._id;
+    await user.save();
 
-    res.json({ 
+    const token = generateToken(user._id);
+
+    res.status(201).json({ 
       success: true, 
       token,
-      user: { userId: user.userId, fullName: user.fullName }
+      user: { userId: user._id, name: user.name }
     });
 
   } catch (error) {
@@ -74,25 +86,24 @@ router.post('/register', async (req, res) => {
 // Login (Voice Login)
 router.post('/voice-login', async (req, res) => {
   try {
-    // We expect fullName + PIN now since we don't have Clerk session
     const { fullName, voicePin } = loginSchema.parse(req.body);
 
-    const user = await UserProfile.findOne({ fullName });
+    const user = await User.findOne({ name: fullName });
     if (!user) {
       return res.status(404).json({ error: "USER_NOT_FOUND", message: "ما لقيتش حساب بهذا الاسم" });
     }
 
-    const isMatch = await bcrypt.compare(voicePin, user.voicePinHash);
+    const isMatch = await bcrypt.compare(voicePin, user.pinHash);
     if (!isMatch) {
       return res.status(401).json({ error: "INVALID_PIN", message: "الـPIN غالط" });
     }
 
-    const token = generateToken(user.userId);
+    const token = generateToken(user._id);
 
     res.json({ 
       success: true, 
       token,
-      user: { userId: user.userId, fullName: user.fullName }
+      user: { userId: user._id, name: user.name }
     });
 
   } catch (error) {

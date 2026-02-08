@@ -20,17 +20,30 @@ export default function Landing() {
       </div>
 
       {/* Voice Start Button */}
-      <button 
-        className="group relative flex flex-col items-center justify-center w-64 h-64 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-xl hover:scale-105 transition-all focus:ring-8 focus:ring-blue-300 dark:focus:ring-blue-800"
-        aria-label="بَدّى بالصّوت (ابدا التحكم الصوتي)"
-        onClick={() => {
-            // In a real app, this might open a global voice assistant or navigate to a main voice interface
-            alert("المساعد الصوتي باش يخدم توة (Simulation)");
-        }}
-      >
-        <Mic size={64} className="mb-4 group-hover:animate-bounce" />
-        <span className="text-3xl font-bold">بَدّى بالصّوت</span>
-      </button>
+<button
+  className="group relative flex flex-col items-center justify-center w-64 h-64 rounded-full
+             bg-blue-600 hover:bg-blue-700 text-white shadow-xl hover:scale-[1.03] transition-all
+             focus:ring-8 focus:ring-blue-300 dark:focus:ring-blue-800 overflow-hidden"
+  aria-label="بَدّى بالصّوت"
+  onClick={() => alert("المساعد الصوتي باش يخدم توة (Simulation)")}
+>
+  {/* Animated rings */}
+  <span className="absolute inset-0 rounded-full bg-white/10 animate-ping" />
+  <span className="absolute inset-6 rounded-full bg-white/10 blur-xl animate-pulse" />
+
+  {/* Waveform bars */}
+  <div className="absolute bottom-10 flex items-end gap-1 opacity-70">
+    <span className="w-2 h-6 bg-white/80 rounded-full animate-bounce [animation-delay:-0.20s]" />
+    <span className="w-2 h-10 bg-white/80 rounded-full animate-bounce [animation-delay:-0.10s]" />
+    <span className="w-2 h-14 bg-white/90 rounded-full animate-bounce" />
+    <span className="w-2 h-10 bg-white/80 rounded-full animate-bounce [animation-delay:-0.10s]" />
+    <span className="w-2 h-6 bg-white/80 rounded-full animate-bounce [animation-delay:-0.20s]" />
+  </div>
+
+  <Mic size={64} className="mb-4 drop-shadow-lg group-hover:scale-105 transition-transform" />
+  <span className="text-3xl font-bold">بَدّى بالصّوت</span>
+  <span className="mt-2 text-sm opacity-80">المساعد الصوتي</span>
+</button>
 
       {/* Action Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-3xl mt-8">

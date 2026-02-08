@@ -15,7 +15,7 @@ export const PAGE_SCRIPTS = {
     steps: {
       welcome: 'مرحبا بيك في صفحة الدخول. أنا هنا باش نساعدك. قلّي اسمك الكامل باش نبدّيو.',
       askName: 'قلّي اسمك الكامل من فضلك.',
-      confirmName: 'باهي، {name}. توا قلّي الـPIN متاعك، ستّة أرقام.',
+      confirmName: 'باهِي، {name}. توا قلّي الـPIN متاعك، ستّة أرقام.',
       askPin: 'قلّي الـPIN متاعك، ستّة أرقام.',
       processing: 'لحظة، نتحقّق من المعلومات.',
       success: 'مرحبا بيك! تم الدخول بنجاح.',
@@ -33,7 +33,7 @@ export const PAGE_SCRIPTS = {
       askName: 'قلّي اسمك الكامل من فضلك.',
       confirmName: 'مرحبا سي {name}. توا اختار PIN متكوّن من ستّة أرقام.',
       askPin: 'قلّي الـPIN متاعك، ستّة أرقام.',
-      confirmPin: 'باهي. توا عاود نفس الـPIN باش نتأكّدو.',
+      confirmPin: 'باهِي. توا عاود نفس الـPIN باش نتأكّدو.',
       askConfirmPin: 'عاود نفس الـPIN من فضلك.',
       pinMatch: 'الـPIN متطابق. لحظة نسجّلك.',
       pinMismatch: 'الـPIN موش كيف كيف. عاود الـPIN لولاني.',

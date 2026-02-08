@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowUpRight, ArrowDownLeft, Wallet, User } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, Wallet, User, ShoppingCart } from 'lucide-react';
 import { useVoice } from '../context/VoiceContext';
+import { useBankVoiceFlow } from '../assistant/bankFlow';
 import Input from '../components/Input';
 import api from '../lib/api';
 
@@ -12,7 +13,9 @@ export default function Banque() {
   const [recipient, setRecipient] = useState('');
   const [loading, setLoading] = useState(true);
   
-  const { registerPageHandler, speak } = useVoice();
+  const voice = useVoice();
+  // Activate Bank Voice Flow
+  useBankVoiceFlow(voice);
 
   const fetchData = async () => {
     try {
@@ -51,7 +54,7 @@ export default function Banque() {
       });
       
       setBalance(res.data.balance);
-      speak(`تم تحويل ${transferAmount} دينار لــ ${recipient}`);
+      voice.speak(`تم تحويل ${transferAmount} دينار لــ ${recipient}`);
       setTransferAmount('');
       setRecipient('');
       
@@ -62,7 +65,7 @@ export default function Banque() {
     } catch (error) {
       console.error("Transfer error", error);
       const msg = error.response?.data?.error || "صار مشكل في التحويل";
-      speak(msg);
+      voice.speak(msg);
     }
   };
 
@@ -96,17 +99,28 @@ export default function Banque() {
             transfers.map(action => (
               <div key={action._id} className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-full bg-red-100 text-red-600">
-                    <ArrowUpRight size={20} />
+                  <div className={`p-2 rounded-full ${
+                    action.type === 'TRANSFER_OUT' || action.type === 'CHECKOUT' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'
+                  }`}>
+                    {action.type === 'CHECKOUT' ? <ShoppingCart size={20} /> :
+                     action.type === 'TRANSFER_IN' ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
                   </div>
                   <div>
-                    <p className="font-bold text-slate-800 dark:text-white">تحويل لــ {action.toName}</p>
-                    <p className="text-sm text-slate-500">{new Date(action.createdAt).toLocaleDateString('ar-TN')}</p>
+                    <p className="font-bold text-slate-800 dark:text-slate-200">
+                      {action.type === 'CHECKOUT' ? 'شراء قضية' :
+                       action.type === 'TRANSFER_IN' ? `تحويل من ${action.meta.fromName || 'مجهول'}` :
+                       `تحويل لـ ${action.meta.toName || 'مجهول'}`}
+                    </p>
+                    <p className="text-sm text-slate-500">
+                      {new Date(action.createdAt).toLocaleDateString('ar-TN')}
+                    </p>
                   </div>
                 </div>
-                <span className="font-bold text-slate-800 dark:text-slate-200">
-                  -{action.amount.toFixed(3)}
-                </span>
+                <div className={`font-bold ${
+                  action.type === 'TRANSFER_OUT' || action.type === 'CHECKOUT' ? 'text-red-600' : 'text-green-600'
+                }`}>
+                  {action.amount > 0 ? '+' : ''}{action.amount} د.ت
+                </div>
               </div>
             ))
           )}

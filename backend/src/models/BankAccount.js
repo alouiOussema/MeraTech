@@ -2,13 +2,14 @@ const mongoose = require('mongoose');
 
 const BankAccountSchema = new mongoose.Schema({
   userId: {
-    type: String,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
     required: true,
-    index: true,
+    unique: true,
   },
   balance: {
     type: Number,
-    default: 250,
+    default: 200, // Default start balance
   },
   currency: {
     type: String,

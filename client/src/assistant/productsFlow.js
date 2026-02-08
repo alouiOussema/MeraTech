@@ -1,17 +1,19 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { extractChoiceNumber, normalizeArabic, productMatchScoring, detectIntent, INTENTS, findCategory } from '../lib/arabic';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { extractNumbers, normalizeArabic } from './numberParser';
+import { MENUS } from './menus';
+import { log } from '../lib/voice';
+import { playBeep } from '../lib/audio';
 
 const STATES = {
   IDLE: 'IDLE',
-  MENU: 'MENU',
-  SEARCH_WAIT: 'SEARCH_WAIT',
-  CONFIRM_RETRY: 'CONFIRM_RETRY',
-  CONFIRM_MATCH: 'CONFIRM_MATCH',
-  SELECT_FROM_LIST: 'SELECT_FROM_LIST',
-  QUANTITY: 'QUANTITY',
-  CONFIRM_ADD_MORE: 'CONFIRM_ADD_MORE',
-  CHECKOUT_CONFIRM: 'CHECKOUT_CONFIRM'
+  WAIT_SEARCH_QUERY: 'WAIT_SEARCH_QUERY',
+  WAIT_ADD_PRODUCT_NAME: 'WAIT_ADD_PRODUCT_NAME',
+  WAIT_ADD_QTY: 'WAIT_ADD_QTY',
+  WAIT_CONFIRM_CHECKOUT: 'WAIT_CONFIRM_CHECKOUT',
+  WAIT_CONFIRM_EMPTY: 'WAIT_CONFIRM_EMPTY',
+  // Intermediate states to confirm add after search
+  WAIT_CONFIRM_ADD_SEARCH_RESULT: 'WAIT_CONFIRM_ADD_SEARCH_RESULT'
 };
 
 export function useProductsVoiceFlow({
@@ -20,282 +22,333 @@ export function useProductsVoiceFlow({
   products,
   setSearchQuery,
   searchQuery,
-  searchInputRef,
-  setCategory,
-  categories
+  searchInputRef
 }) {
-  const { speak, startListening, setCommandHandler } = voice;
-  const { addToCart, checkout } = cart;
+  const { speak, startListening, setCommandHandler, resetTranscript } = voice;
+  const { addToCart, checkout, clearCart, cartItems, cartTotals } = cart;
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // State Machine
   const [flowState, setFlowState] = useState(STATES.IDLE);
-  const [matchedProducts, setMatchedProducts] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
   
+  // Refs for access in callbacks
   const stateRef = useRef(flowState);
   const productsRef = useRef(products);
-  const matchedProductsRef = useRef(matchedProducts);
   const selectedProductRef = useRef(selectedProduct);
-  const categoriesRef = useRef(categories);
 
   useEffect(() => {
+    console.log("[ProductsFlow] Mounted");
     stateRef.current = flowState;
     productsRef.current = products;
-    matchedProductsRef.current = matchedProducts;
     selectedProductRef.current = selectedProduct;
-    categoriesRef.current = categories;
-  }, [flowState, products, matchedProducts, selectedProduct, categories]);
+  }, [flowState, products, selectedProduct]);
 
-  const startMenu = useCallback(() => {
-    setFlowState(STATES.MENU);
-    speak("مرحبا بيك في قسم المنتوجات. تنجم تقلي: نحب نشوف ماكلة، ولا لوج على زيت، ولا زيد هذا للسلّة.", () => startListening());
-  }, [speak, startListening]);
-
-  const startSearch = useCallback(() => {
-    setFlowState(STATES.SEARCH_WAIT);
-    setSearchQuery('');
-    if (searchInputRef?.current) {
-      setTimeout(() => {
-        searchInputRef.current.focus();
-      }, 500);
+  // --- Entry Announcement ---
+  useEffect(() => {
+    if (location.pathname === '/products') {
+        console.log("[ProductsFlow] Announcing products menu on entry");
+        setFlowState(STATES.IDLE);
+        const menu = MENUS['/products'];
+        if (menu) {
+             speak(menu.welcome, () => {
+                playBeep();
+                startListening();
+             }, true);
+        }
     }
-    speak("قلّي اسم المنتوج اللي تحب عليه.", () => startListening());
-  }, [speak, startListening, setSearchQuery, searchInputRef]);
+  }, [location.pathname, speak, startListening]);
 
-  const handleSearch = useCallback((transcript) => {
-    const query = normalizeArabic(transcript);
-    setSearchQuery(query);
+  // --- Helper: Product Finder ---
+  const findProductByName = (name) => {
+    if (!name) return null;
+    const normalizedQuery = normalizeArabic(name).toLowerCase();
     
-    const allProducts = productsRef.current;
-    const scored = allProducts.map(p => ({
-      product: p,
-      score: productMatchScoring(query, p.name)
-    })).filter(p => p.score > 0);
+    // Exact match or substring
+    const matches = productsRef.current.filter(p => {
+        const normP = normalizeArabic(p.name).toLowerCase();
+        return normP.includes(normalizedQuery);
+    });
 
-    scored.sort((a, b) => b.score - a.score);
-    const matches = scored.map(s => s.product);
+    if (matches.length === 0) return null;
+    
+    // Pick best match (shortest name usually closest to query, or first)
+    // For now, return first match
+    return matches[0];
+  };
 
-    if (matches.length === 0) {
-      setFlowState(STATES.CONFIRM_RETRY);
-      speak("هالمنتج ماشي موجود فالقائمة توّة. تحب تعاود؟ قول نعم ولا لا.", () => startListening());
-    } else if (matches.length === 1 && scored[0].score > 0.5) {
-      const p = matches[0];
-      setSelectedProduct(p);
-      setFlowState(STATES.CONFIRM_MATCH);
-      speak(`لقيت ${p.name}. تحب نزيدو للسلّة؟ قول نعم ولا لا.`, () => startListening());
-    } else {
-      setMatchedProducts(matches.slice(0, 5));
-      setFlowState(STATES.SELECT_FROM_LIST);
-      
-      const listTxt = matches.slice(0, 5).map((p, i) => `${i + 1}. ${p.name}`).join('. ');
-      speak(`${listTxt}. اختار رقم المنتوج.`, () => startListening());
+  // --- Helpers: Speak & Listen ---
+  const prompt = (text, nextState) => {
+    if (nextState) setFlowState(nextState);
+    speak(text, () => {
+        playBeep();
+        startListening();
+    }, true);
+  };
+
+  const repeatMenu = () => {
+    const menu = MENUS['/products'];
+    if (menu) {
+        speak(menu.welcome, () => {
+            playBeep();
+            startListening();
+        }, true);
     }
-  }, [speak, startListening, setSearchQuery]);
+  };
 
-  const askQuantity = useCallback(() => {
-    setFlowState(STATES.QUANTITY);
-    speak("قدّاش تحب نزيد؟ قول رقم من 1 حتى 9.", () => startListening());
-  }, [speak, startListening]);
+  // --- Handlers for Options ---
 
-  const confirmAddMore = useCallback(() => {
-    setFlowState(STATES.CONFIRM_ADD_MORE);
-    speak("تمّ. تحب نزيدلك منتوج آخر؟ قول نعم ولا لا.", () => startListening());
-  }, [speak, startListening]);
+  // Option 1: Filter/Search
+  const startSearch = () => {
+    prompt("قول اسم المنتَج اللي تحب تلوج عليه.", STATES.WAIT_SEARCH_QUERY);
+  };
 
-  const startCheckout = useCallback(() => {
-    setFlowState(STATES.CHECKOUT_CONFIRM);
-    speak("الخلاص بعد التوصيل. نأكد الطلب؟ قول نعم ولا لا.", () => startListening());
-  }, [speak, startListening, cart]);
+  const handleSearchQuery = (text) => {
+    const product = findProductByName(text);
+    // Update UI filter
+    setSearchQuery(text); 
+    console.log(`[ProductsFlow] setSearchQuery="${text}"`);
 
+    // Force input value update to trigger React state if needed (though setSearchQuery should handle it)
+    if (searchInputRef.current) {
+        searchInputRef.current.value = text;
+        // Dispatch input event to ensure listeners catch it
+        const event = new Event('input', { bubbles: true });
+        searchInputRef.current.dispatchEvent(event);
+    }
+    
+    if (product) {
+        setSelectedProduct(product);
+        prompt(`لقيت ${product.name}. تحب نزيدوه للسلة؟ اختار نعم أو لا.`, STATES.WAIT_CONFIRM_ADD_SEARCH_RESULT);
+    } else {
+        prompt("ما لقيتش. تحب تعاود؟ اختار نعم أو لا.", STATES.WAIT_SEARCH_QUERY); // We stay in query state but ask logic implies branching
+        // Actually, if 'Yes' -> WAIT_SEARCH_QUERY. If 'No' -> IDLE.
+        // Let's handle the Yes/No for retry in a sub-logic or just re-prompt.
+        // User spec: "if not found: '...'. (yes => WAIT_SEARCH_QUERY, no => IDLE)"
+        // So we need a temporary state or handle it here?
+        // Let's use a specialized state for Retry Confirmation is safer, 
+        // OR just interpret "Yes" in WAIT_SEARCH_QUERY as "Retry"? No, that's ambiguous.
+        // Let's assume we prompt and stay in a "WAIT_RETRY_SEARCH" state? 
+        // User spec didn't explicitly name it, but implied logic.
+        // I'll stick to simple: Just ask "Say product name again" if they want, or use a specific state.
+        // Let's use a temporary state for clarity:
+        setFlowState('WAIT_SEARCH_RETRY_CONFIRM');
+    }
+  };
+
+  // Option 2: Add Product
+  const startAddProduct = () => {
+    prompt("شنوة اسم المنتَج؟", STATES.WAIT_ADD_PRODUCT_NAME);
+  };
+
+  const handleAddProductName = (text) => {
+    const product = findProductByName(text);
+    if (product) {
+        setSelectedProduct(product);
+        prompt("قدّاش تحب؟", STATES.WAIT_ADD_QTY);
+    } else {
+        prompt("ما لقيتش. عاود اسم المنتَج.", STATES.WAIT_ADD_PRODUCT_NAME);
+    }
+  };
+
+  const handleAddQty = (text) => {
+    const nums = extractNumbers(text);
+    const qty = nums.length > 0 ? nums[0] : null;
+    if (qty && qty > 0) {
+        addToCart(selectedProductRef.current, qty);
+        speak(`تمام. زدنا ${qty} من ${selectedProductRef.current.name} للسلة.`, () => {
+             // Return to IDLE + repeat menu
+             // Or ask "Want something else?" -> Spec says "return to IDLE and repeat products menu"
+             setFlowState(STATES.IDLE);
+             repeatMenu();
+        });
+    } else {
+        prompt("ما فهمتش الرقم. عاود قولي قدّاش تحب.", STATES.WAIT_ADD_QTY);
+    }
+  };
+
+  // Option 3: Read Cart
+  const handleReadCart = () => {
+    if (cartItems.length === 0) {
+        speak("السلة فارغة.", () => {
+            setFlowState(STATES.IDLE);
+            repeatMenu();
+        });
+        return;
+    }
+    
+    let text = "عندك في السلة: ";
+    cartItems.forEach(item => {
+        text += `${item.quantity} من ${item.name}. `;
+    });
+    // Assuming cartTotals is available
+    if (cartTotals) {
+        text += `المجموع ${cartTotals.total} دينار. `;
+    }
+    
+    speak(text, () => {
+        setFlowState(STATES.IDLE);
+        repeatMenu();
+    });
+  };
+
+  // Option 4: Checkout
+  const startCheckout = () => {
+    prompt("باش نأكدو الطلب. اختار نعم أو لا.", STATES.WAIT_CONFIRM_CHECKOUT);
+  };
+
+  const handleCheckoutConfirm = (text) => {
+    const normalized = normalizeArabic(text);
+    if (normalized.includes('نعم')) {
+        checkout();
+        clearCart();
+        speak("تمّ تأكيد الطلب. السلة تفرّغت.", () => {
+            setFlowState(STATES.IDLE);
+            // Assuming stay idle
+        });
+    } else {
+        speak("تمام.", () => {
+            setFlowState(STATES.IDLE);
+        });
+    }
+  };
+
+  // Option 5: Empty Cart
+  const startEmptyCart = () => {
+    prompt("متأكّد تحب تفرّغ السلة؟ اختار نعم أو لا.", STATES.WAIT_CONFIRM_EMPTY);
+  };
+
+  const handleEmptyConfirm = (text) => {
+    const normalized = normalizeArabic(text);
+    if (normalized.includes('نعم')) {
+        clearCart();
+        speak("تمّ تفريغ السلة.", () => {
+            setFlowState(STATES.IDLE);
+        });
+    } else {
+        setFlowState(STATES.IDLE);
+    }
+  };
+
+
+  // --- MAIN HANDLER ---
   const handleVoiceCommand = useCallback((text) => {
     const currentState = stateRef.current;
+    const nums = extractNumbers(text);
+    const choiceNum = nums.length > 0 ? nums[0] : null;
     const normalized = normalizeArabic(text);
-    const choiceNum = extractChoiceNumber(text);
-    const intent = detectIntent(text);
 
-    // Global Intent Handling (Overrides state unless in critical confirmation)
-    const isCriticalState = [
-      STATES.QUANTITY, 
-      STATES.CHECKOUT_CONFIRM, 
-      STATES.CONFIRM_MATCH
-    ].includes(currentState);
+    log('info', `[ProductsFlow] state=${currentState}, received="${text}", parsedNumber=${choiceNum}`);
 
-    // If strong intent and not in critical middle-of-action state
-    if (intent.type !== INTENTS.UNKNOWN && !isCriticalState) {
-       switch (intent.type) {
-         case INTENTS.FILTER:
-           const cat = findCategory(text, categoriesRef.current || []);
-           if (cat) {
-             setCategory(cat);
-             setSearchQuery(''); // Clear search when filtering
-             speak(`هاني صفيت المنتوجات على ${cat}.`);
-             return;
-           }
-           // If no category found but intent was filter/fetch, maybe treat as search?
-           // fall through
-           break;
-           
-         case INTENTS.SEARCH:
-           // Extract query from "Find X"
-           // Simple heuristic: remove the command words
-           // But handleSearch does scoring, so passing full text might be okay if scoring is robust,
-           // or we clean it. normalizeArabic cleans a bit.
-           // Better to jump to search wait or just execute search?
-           // If user said "Find oil", execute search immediately.
-           // Remove command words:
-           let query = normalized
-             .replace(/(لوج|بحث|find|search|look for|على|عن)/g, '')
-             .trim();
-           if (query.length > 2) {
-             handleSearch(query);
-             return;
-           }
-           break;
-           
-         case INTENTS.ADD_CART:
-             // If "add this" and we have a selected product or search result?
-             // But usually "add X".
-             // If "add X", search for X, then add.
-             let addQuery = normalized
-               .replace(/(زيد|حط|اشري|add|buy|لي|للسلة)/g, '')
-               .trim();
-             
-             if (addQuery === 'هذا' || addQuery === 'this') {
-                // If we have a selected product
-                if (selectedProductRef.current) {
-                   askQuantity();
-                   return;
-                }
-             }
-
-             if (addQuery.length > 2) {
-                // Treat as search for product to add
-                // We can use handleSearch logic but with auto-select if strong match
-                handleSearch(addQuery); 
-                // handleSearch will eventually ask "Do you want to add it?"
-                return;
-             }
-             break;
-
-         case INTENTS.CHECKOUT:
-            startCheckout();
-            return;
-       }
+    // Global Rules (0 and 9) - Apply in ALL states
+    if (choiceNum === 0) {
+        log('info', '[ProductsFlow] Action: GO BACK');
+        navigate(-1);
+        setFlowState(STATES.IDLE);
+        return;
+    }
+    if (choiceNum === 9) {
+        log('info', '[ProductsFlow] Action: REPEAT MENU');
+        repeatMenu();
+        // Keep current state? Or reset?
+        // Spec says "9 = REPEAT products menu". Usually implies resetting context.
+        // But if user is in middle of flow, repeating menu might be confusing if state doesn't reset.
+        // "return to IDLE and repeat products menu" is used elsewhere.
+        // Let's reset to IDLE for safety when repeating main menu.
+        setFlowState(STATES.IDLE);
+        return;
     }
 
-    // State-Specific Logic (Fallback)
+    // State Machine Logic
     switch (currentState) {
-      case STATES.MENU:
-        if (choiceNum === 1 || normalized.includes('بحث') || normalized.includes('لوج') || normalized.includes('تفلتر')) {
-          startSearch();
-        } else if (choiceNum === 2 || normalized.includes('رجوع')) {
-          navigate(-1);
-          speak("رجعنا للي قبل.");
-        } else {
-          // If no global intent matched and no menu option matched
-          speak("تنجم تقلي شنوه تحب تلوج، ولا تختار فئة.", () => startListening());
+      case STATES.IDLE:
+        if (choiceNum === 1) startSearch();
+        else if (choiceNum === 2) startAddProduct();
+        else if (choiceNum === 3) handleReadCart();
+        else if (choiceNum === 4) startCheckout();
+        else if (choiceNum === 5) startEmptyCart();
+        else {
+            // Invalid number or text in IDLE
+            // Maybe ignore or re-announce
         }
         break;
 
-      case STATES.SEARCH_WAIT:
-        handleSearch(text);
+      case STATES.WAIT_SEARCH_QUERY:
+        handleSearchQuery(text);
         break;
 
-      case STATES.CONFIRM_RETRY:
+      case 'WAIT_SEARCH_RETRY_CONFIRM': // Temporary internal state
         if (normalized.includes('نعم')) {
-          startSearch();
-        } else if (normalized.includes('لا')) {
-          startMenu();
+            prompt("قول اسم المنتَج.", STATES.WAIT_SEARCH_QUERY);
         } else {
-          speak("قول نعم ولا لا.", () => startListening());
+            setFlowState(STATES.IDLE);
+            repeatMenu();
         }
         break;
 
-      case STATES.CONFIRM_MATCH:
+      case STATES.WAIT_CONFIRM_ADD_SEARCH_RESULT:
         if (normalized.includes('نعم')) {
-          askQuantity();
+            prompt("قدّاش تحب؟", STATES.WAIT_ADD_QTY);
         } else if (normalized.includes('لا')) {
-          speak("تحب تڨلّب على منتوج آخر؟ قول نعم ولا لا.", () => startListening());
-          setFlowState(STATES.CONFIRM_ADD_MORE);
+            setFlowState(STATES.IDLE);
+            repeatMenu();
         } else {
-          speak("قول نعم باش تزيدو، ولا لا.", () => startListening());
+            prompt("اختار نعم أو لا.", STATES.WAIT_CONFIRM_ADD_SEARCH_RESULT);
         }
         break;
 
-      case STATES.SELECT_FROM_LIST:
-        if (choiceNum && choiceNum >= 1 && choiceNum <= matchedProductsRef.current.length) {
-          const p = matchedProductsRef.current[choiceNum - 1];
-          setSelectedProduct(p);
-          askQuantity();
-        } else {
-          const listTxt = matchedProductsRef.current.map((p, i) => `${i + 1}. ${p.name}`).join('. ');
-          speak(`رقم غالط. ${listTxt}. اختار رقم.`, () => startListening());
-        }
+      case STATES.WAIT_ADD_PRODUCT_NAME:
+        handleAddProductName(text);
         break;
 
-      case STATES.QUANTITY:
-        if (choiceNum && choiceNum >= 1 && choiceNum <= 9) {
-          const p = selectedProductRef.current;
-          addToCart(p, choiceNum);
-          speak(`تمّ. زدنا ${choiceNum} من ${p.name} للسلّة.`);
-          setTimeout(() => confirmAddMore(), 2000);
-        } else {
-          speak("اختار رقم من 1 ل 9.", () => startListening());
-        }
+      case STATES.WAIT_ADD_QTY:
+        handleAddQty(text);
         break;
 
-      case STATES.CONFIRM_ADD_MORE:
-        if (normalized.includes('نعم')) {
-          startSearch();
-        } else if (normalized.includes('لا')) {
-          startCheckout();
-        } else {
-          speak("قول نعم ولا لا.", () => startListening());
-        }
+      case STATES.WAIT_CONFIRM_CHECKOUT:
+        handleCheckoutConfirm(text);
         break;
 
-      case STATES.CHECKOUT_CONFIRM:
-        if (normalized.includes('نعم')) {
-          checkout();
-          speak("الطلب متاعك تسجل. يوصلك قريبا.", () => {
-             navigate('/');
-          });
-        } else if (normalized.includes('لا')) {
-          startMenu();
-        } else {
-           speak("نأكد الطلب؟ قول نعم ولا لا.", () => startListening());
-        }
+      case STATES.WAIT_CONFIRM_EMPTY:
+        handleEmptyConfirm(text);
         break;
 
       default:
-        // Don't restart menu on every unknown sound, just log it or give a subtle hint if needed
-        console.log("Unknown command in MENU state:", text);
-        // startMenu(); // CAUSES LOOP if noise is detected
         break;
     }
-  }, [navigate, speak, startListening, startSearch, handleSearch, startMenu, askQuantity, confirmAddMore, startCheckout, addToCart, checkout, setCategory]);
+  }, [
+    navigate, speak, startListening, addToCart, checkout, clearCart, cartItems, cartTotals,
+    setSearchQuery // Used in handleSearchQuery
+  ]);
 
+  // --- Keyboard Support ---
   useEffect(() => {
-    // Only start menu ONCE on mount
-    const timer = setTimeout(() => {
-       startMenu();
-    }, 1000);
-
-    setCommandHandler(() => handleVoiceCommand);
-
-    return () => {
-      clearTimeout(timer);
-      setCommandHandler(null);
+    const handleKeyDown = (e) => {
+        // Only trigger if we are on products page
+        // Map keys 0-9 to handleVoiceCommand
+        if (e.key >= '0' && e.key <= '9') {
+            log('info', `[ProductsFlow] Keyboard input: ${e.key}`);
+            handleVoiceCommand(e.key);
+        }
     };
-  }, []); // Empty dependency array to prevent loops!
 
-  // Update command handler when it changes (if needed, but handleVoiceCommand should use refs for state)
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleVoiceCommand]);
+
+  // --- Registration ---
   useEffect(() => {
+    log('info', '[ProductsFlow] Registering high-priority handler');
+    setFlowState(STATES.IDLE);
     setCommandHandler(() => handleVoiceCommand);
-  }, [handleVoiceCommand, setCommandHandler]);
+    
+    // Cleanup
+    return () => {
+        log('info', '[ProductsFlow] Unregistering handler');
+        setCommandHandler(null);
+    };
+  }, [setCommandHandler, handleVoiceCommand]);
 
-  return {
-    flowState,
-    matchedProducts,
-    selectedProduct
-  };
+  return { flowState };
 }

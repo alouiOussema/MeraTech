@@ -1,27 +1,29 @@
 
 // Arabic Normalization & Number Extraction Helper
 
-// Arabic Number Words Mapping (1-9)
+// Arabic Number Words Mapping (0-9)
 // Keys must be normalized (alef->a, teh marbuta->ha, yeh->ya)
 const ARABIC_WORD_TO_DIGIT = {
+  // 0
+  'صفر': 0, 'زيرو': 0, 'والو': 0, 'zero': 0,
   // 1
-  'واحد': 1, 'واحده': 1, 'لاول': 1, 'الاول': 1, 'اول': 1,
+  'واحد': 1, 'واحده': 1, 'لاول': 1, 'الاول': 1, 'اول': 1, 'one': 1,
   // 2
-  'اثنين': 2, 'ثنين': 2, 'ثاني': 2, 'الثاني': 2, 'زوج': 2,
+  'اثنين': 2, 'ثنين': 2, 'ثاني': 2, 'الثاني': 2, 'زوج': 2, 'two': 2, 'to': 2,
   // 3
-  'ثلاثة': 3, 'ثلاثه': 3, 'تلاثة': 3, 'تلاثه': 3, 'ثالث': 3, 'الثالث': 3, 'تلاث': 3,
+  'ثلاثة': 3, 'ثلاثه': 3, 'تلاثة': 3, 'تلاثه': 3, 'ثالث': 3, 'الثالث': 3, 'تلاث': 3, 'three': 3,
   // 4
-  'اربعة': 4, 'اربعه': 4, 'رابع': 4, 'الرابع': 4,
+  'اربعة': 4, 'اربعه': 4, 'رابع': 4, 'الرابع': 4, 'four': 4, 'for': 4,
   // 5
-  'خمسة': 5, 'خمسه': 5, 'خامس': 5, 'الخامس': 5,
+  'خمسة': 5, 'خمسه': 5, 'خامس': 5, 'الخامس': 5, 'five': 5,
   // 6
-  'ستة': 6, 'سته': 6, 'سادس': 6, 'السادس': 6,
+  'ستة': 6, 'سته': 6, 'سادس': 6, 'السادس': 6, 'six': 6,
   // 7
-  'سبعة': 7, 'سبعه': 7, 'سابع': 7, 'السابع': 7,
+  'سبعة': 7, 'سبعه': 7, 'سابع': 7, 'السابع': 7, 'seven': 7,
   // 8
-  'ثمانية': 8, 'ثمانيه': 8, 'ثامن': 8, 'الثامن': 8, 'تمنية': 8, 'تمنيه': 8,
+  'ثمانية': 8, 'ثمانيه': 8, 'ثامن': 8, 'الثامن': 8, 'تمنية': 8, 'تمنيه': 8, 'eight': 8,
   // 9
-  'تسعة': 9, 'تسعه': 9, 'تاسع': 9, 'التاسع': 9
+  'تسعة': 9, 'تسعه': 9, 'تاسع': 9, 'التاسع': 9, 'nine': 9
 };
 
 const INDIC_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
@@ -37,25 +39,29 @@ const INDIC_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'
 export const normalizeArabic = (text) => {
   if (!text) return '';
   return text
-    .replace(/[^\w\s\u0600-\u06FF]/g, '') // Remove punctuation (keep arabic chars, digits, spaces)
+    .toLowerCase() // Handle English chars
+    .replace(/[^\w\s\u0600-\u06FF]/g, ' ') // Replace punctuation with space
+    .replace(/[.,،؟?!]/g, ' ') // Explicitly handle common punctuation just in case
     .replace(/[\u064B-\u065F]/g, '') // Remove diacritics
     .replace(/[أإآ]/g, 'ا') // Normalize Alef
-    .replace(/ى/g, 'ي') // Normalize Yeh
-    .replace(/ة/g, 'ه') // Normalize Teh Marbuta
+    .replace(/[ى]/g, 'ي') // Normalize Yeh
+    .replace(/[ة]/g, 'ه') // Normalize Teh Marbuta
     .replace(/\s+/g, ' ') // Collapse spaces
     .trim();
 };
 
 export const isYes = (text) => {
   const t = normalizeArabic(text);
-  // Match common yes words, allowing for surrounding text
-  return /\b(نعم|اي|ايه|صحيح|موافق|باهي|ok|yes|oui|ah|y|ye)\b/i.test(t);
+  // Match common yes words
+  // Includes: naam, ay, ey, oui, yes, tamam, mwafaq, bahi, ok
+  return /(?:^|\s)(نعم|اي|ايه|إي|صحيح|موافق|باهي|باهِي|تمام|ok|yes|oui|ah|y|ye)(?:\s|$)/i.test(t);
 };
 
 export const isNo = (text) => {
   const t = normalizeArabic(text);
-  // Match common no words, allowing for surrounding text
-  return /\b(لا|للا|غلط|no|non|n)\b/i.test(t);
+  // Match common no words
+  // Includes: la, non, no, mosh, manich
+  return /(?:^|\s)(لا|للا|لي|غلط|مش|موش|مانيش|no|non|n)(?:\s|$)/i.test(t);
 };
 
 /**
@@ -91,10 +97,7 @@ export const extractNumbers = (text) => {
     }
 
     // 3. Check for words
-    // We try to match the token against keys in our map
-    // The map keys are already somewhat normalized, but let's normalize the token fully
-    // We iterate the map because the token might be "رقم ثلاثة" -> we split by space earlier so "ثلاثة" is token
-    if (ARABIC_WORD_TO_DIGIT[token]) {
+    if (ARABIC_WORD_TO_DIGIT.hasOwnProperty(token)) {
       foundNumbers.push(ARABIC_WORD_TO_DIGIT[token]);
     }
   }
@@ -110,13 +113,6 @@ export const extractNumbers = (text) => {
  */
 export const detectDoubleShortcut = (numbers) => {
   if (numbers.length < 2) return null;
-
-  // We look for any consecutive pair or just existence of two same numbers?
-  // "Transcript contains the same number twice in the same utterance"
-  // Implies "3 3" or "I want 3 and 3". Let's look for consecutive pair or just counts.
-  // The prompt examples: "3 3", "ثلاثة ثلاثة".
-  // Let's go with consecutive pair for stricter intent, or just checking if array is [x, x].
-  // Assuming short commands, [x, x] is likely. But "Go to 3 and 3" -> [3, 3].
   
   for (let i = 0; i < numbers.length - 1; i++) {
     if (numbers[i] === numbers[i+1]) {
@@ -136,14 +132,25 @@ export const detectDoubleShortcut = (numbers) => {
 };
 
 /**
- * Parse a single menu choice (1-9).
- * Returns number if exactly one valid number is found (or first one if multiple? usually one).
+ * CANONICAL FUNCTION: Parse a choice number (0-9) from text.
+ * Returns the FIRST valid number found.
  * @param {string} text 
- * @returns {number|null}
+ * @returns {number|null} Integer 0-9 or null
+ */
+export const parseChoiceNumber = (text) => {
+  const nums = extractNumbers(text);
+  // Return first number that is between 0 and 9
+  const valid = nums.find(n => n >= 0 && n <= 9);
+  return valid !== undefined ? valid : null;
+};
+
+/**
+ * Legacy wrapper for backward compatibility if needed, 
+ * but better to replace usages with parseChoiceNumber.
  */
 export const parseSingleMenuChoice = (text) => {
-  const nums = extractNumbers(text);
-  // If we have numbers, return the first valid 1-9
-  const valid = nums.find(n => n >= 1 && n <= 9);
-  return valid || null;
+  const n = parseChoiceNumber(text);
+  // Original only allowed 1-9? User request says 0 is allowed now for Back.
+  // We will allow 0-9 here too to be safe.
+  return n; 
 };

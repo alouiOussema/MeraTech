@@ -30,6 +30,7 @@ app.use('/api', require('./routes/bank'));
 app.use('/api', require('./routes/courses'));
 app.use('/api', require('./routes/prices'));
 app.use('/api/products', require('./routes/products'));
+app.use('/api/orders', require('./routes/orders'));
 app.use('/api/nlu', require('./routes/nlu'));
 app.use('/api/auth', require('./routes/auth'));
 

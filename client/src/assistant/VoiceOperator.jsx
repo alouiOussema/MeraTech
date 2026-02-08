@@ -5,11 +5,11 @@ import { useVoice } from '../context/VoiceContext';
 import { useCart } from '../context/CartContext';
 import api from '../lib/api'; // Keeping NLU as fallback if needed, but prioritizing numbers
 import { executors } from './executors';
-import { MENUS } from './menus';
+import { MENUS, QUICK_MENU } from './menus';
 import { 
   extractNumbers, 
   detectDoubleShortcut, 
-  parseSingleMenuChoice,
+  parseChoiceNumber, // Updated import
   normalizeArabic,
   isYes,
   isNo
@@ -20,9 +20,12 @@ export default function VoiceOperator() {
   const {
     setCommandHandler,
     setDefaultCommandHandler,
+    commandHandler, // Active command handler (from specific flows like Bank)
     speak,
     startListening,
-    stopListening
+    stopListening,
+    interactionMode,
+    onboardingActive
   } = useVoice();
 
   const { cartItems, cartTotals } = useCart();
@@ -50,6 +53,11 @@ export default function VoiceOperator() {
   useEffect(() => {
     // Correctly set the function in state by returning it from the updater
     if (setDefaultCommandHandler) {
+      if (onboardingActive || interactionMode !== 'VOICE') {
+         setDefaultCommandHandler(() => null);
+         return;
+      }
+
       setDefaultCommandHandler(() => (text) => {
         if (handleVoiceCommandRef.current) {
           return handleVoiceCommandRef.current(text);
@@ -57,7 +65,7 @@ export default function VoiceOperator() {
       });
       return () => setDefaultCommandHandler(() => null);
     }
-  }, [setDefaultCommandHandler]);
+  }, [setDefaultCommandHandler, onboardingActive, interactionMode]);
 
   // 2. Announce Menu Logic
   const announceMenu = useCallback((isRetry = false) => {
@@ -76,16 +84,32 @@ export default function VoiceOperator() {
       menu.options.forEach(opt => {
         text += `${opt.id}: ${opt.label}. `;
       });
+      // Append global options to announcement
+      text += '9: نعاود القائمة. 0: رجوع.';
     }
 
     // Speak, then Beep and Listen
     // We stop listening before speaking to avoid self-pickup (though VoiceContext handles this usually)
+    stopListening();
     speak(text, () => {
       playBeep();
       startListening();
       startWaitTimeout();
     }, true); // Prevent auto-restart from context
-  }, [location.pathname, speak, startListening]);
+  }, [location.pathname, speak, startListening, stopListening]);
+
+  // Helper: Speak Quick Menu
+  const speakQuickMenu = useCallback(() => {
+    const text = "باهِي. هاني نعطيك القائمة السريعة: " +
+      "1 للرئيسية، 2 للدخول، 3 للتسجيل، 4 للبنك، 5 للمنتجات، 6 للحساب، 7 للإعدادات، و 9 باش نعاود القائمة.";
+    
+    stopListening();
+    speak(text, () => {
+      playBeep();
+      startListening();
+      startWaitTimeout();
+    }, true);
+  }, [speak, startListening, stopListening]);
 
   // 3. Timeout Logic
   const startWaitTimeout = () => {
@@ -110,6 +134,10 @@ export default function VoiceOperator() {
   // 4. Path Change Listener
   useEffect(() => {
     const currentPath = location.pathname;
+    
+    // Log route change
+    console.log(`[VoiceOperator] Route changed: ${currentPath} | Mode: ${interactionMode}`);
+
     if (currentPath !== lastPath.current) {
       lastPath.current = currentPath;
       setConfirmingOption(null);
@@ -117,10 +145,16 @@ export default function VoiceOperator() {
       
       // Short delay to allow page load
       setTimeout(() => {
-        announceMenu();
-      }, 1000);
+        // Only auto-announce in VOICE mode and NOT during onboarding
+        if (interactionMode === 'VOICE' && !onboardingActive) {
+           console.log(`[VoiceOperator] Announcing menu for ${currentPath}`);
+           announceMenu();
+        } else {
+           console.log(`[VoiceOperator] Skipped announcement. Mode: ${interactionMode}, Onboarding: ${onboardingActive}`);
+        }
+      }, 500); // Reduced delay to 500ms
     }
-  }, [location.pathname, announceMenu]);
+  }, [location.pathname, announceMenu, interactionMode, onboardingActive]);
 
   // 6. Action Executors
   const handleDoubleShortcut = useCallback((action) => {
@@ -141,11 +175,11 @@ export default function VoiceOperator() {
         if (menu) {
            helpText += `انت في ${menu.title}. `;
            helpText += "تنجم تختار رقم من 1 لـ 9. ";
-           helpText += "أو استعمل الاختصارات: 1 1 للرئيسية، 2 2 للرجوع، 3 3 للبنك، 4 4 للمتجر. ";
-           helpText += "توا نعاودلك القائمة. ";
+           // helpText += "أو استعمل الاختصارات: 1 1 للرئيسية، 2 2 للرجوع، 3 3 للبنك، 4 4 للمتجر. "; // Legacy
+           helpText += "تسمع القائمة السريعة؟ ";
         }
         speak(helpText, () => {
-           announceMenu();
+           speakQuickMenu();
         }, true);
         break;
       default:
@@ -167,7 +201,10 @@ export default function VoiceOperator() {
                         document.querySelector(`#${option.payload}`);
           if (input) {
             input.focus();
-            speak("تفضل، اكتب.", null, true); // No restart, user types
+            // Only speak generic prompt if not on Login/Register (which have custom flows)
+            if (!['/login', '/register'].includes(location.pathname)) {
+               speak("تفضل، اكتب.", null, true); 
+            }
           } else {
             speak("ما لقيتش الخانة.", () => announceMenu(), true);
           }
@@ -190,7 +227,11 @@ export default function VoiceOperator() {
           executors.click('[aria-label="Cart"]'); 
           break;
         case 'LOGOUT':
-           navigate('/login'); 
+           speak("خرجت من الحساب.", () => {
+             localStorage.removeItem('auth_token');
+             localStorage.removeItem('auth_user');
+             window.location.href = '/'; 
+           }, true);
            break;
         case 'READ_BALANCE':
            speak("رصيدك الحالي هو 1200 دينار.");
@@ -208,7 +249,12 @@ export default function VoiceOperator() {
   }, [navigate, speak]);
 
   // 5. Core Voice Command Handler
-  const handleVoiceCommand = useCallback(async (text) => {
+  const handleVoiceCommand = useCallback(async (text, options = {}) => {
+    // If from keyboard, bypass mode check
+    if (!options.fromKeyboard) {
+       if (onboardingActive || interactionMode !== 'VOICE') return;
+    }
+
     if (isProcessing) return;
     setIsProcessing(true);
     
@@ -235,22 +281,30 @@ export default function VoiceOperator() {
       // B. Confirmation Flow
       if (confirmingOption) {
         if (isYes(text)) {
-          speak("باهي.", async () => {
+          stopListening();
+          speak("باهِي.", async () => {
             await executeMenuOption(confirmingOption);
             setConfirmingOption(null);
+            
             // If action is not navigation, listen again?
-            if (confirmingOption.action !== 'NAVIGATE') {
+            // BUT if it's FOCUS on Login/Register, we expect the page to take over (Form Guidance).
+            const isFormFocus = confirmingOption.action === 'FOCUS' && 
+                               ['/login', '/register'].includes(location.pathname);
+            
+            if (confirmingOption.action !== 'NAVIGATE' && !isFormFocus) {
                playBeep();
                startListening();
             }
           }, true);
         } else if (isNo(text)) {
-          speak("باهي، ألغينا.", () => {
+          stopListening();
+          speak("باهِي، ألغينا.", () => {
             setConfirmingOption(null);
             announceMenu();
           }, true);
         } else {
-          speak("جاوب ب نعم ولا لا.", () => {
+          stopListening();
+          speak("جاوب ب نعم او لا .", () => {
              playBeep();
              startListening();
              startWaitTimeout();
@@ -260,30 +314,47 @@ export default function VoiceOperator() {
         return;
       }
 
-      // C. Single Menu Choice
-      const choice = parseSingleMenuChoice(text);
-      if (choice) {
-        const menu = MENUS[location.pathname];
-        const option = menu?.options.find(o => o.id === choice);
-        
-        if (option) {
-          speak(`اخترت رقم ${choice}: ${option.label}. صحيح؟`, () => {
-            setConfirmingOption(option);
-            playBeep();
-            startListening();
-            startWaitTimeout();
-          }, true);
-          setIsProcessing(false);
-          return;
-        }
-      }
+      // C. Global & Menu Navigation (The New Logic)
+      const n = parseChoiceNumber(text);
+      console.log(`[VoiceOperator] Parsed Number: ${n} (raw: "${text}")`);
 
-      // D. Fallback / No Match
-      speak("ما فهمتش الرقم. عاود اختار.", () => {
-         playBeep();
-         startListening();
-         startWaitTimeout();
-      }, true);
+      if (n !== null) {
+          // 1. Global Shortcuts
+          if (n === 0) {
+              handleDoubleShortcut({ type: 'GO_BACK' }); // Reuse existing logic
+              setIsProcessing(false);
+              return;
+          }
+          if (n === 9) {
+              announceMenu();
+              setIsProcessing(false);
+              return;
+          }
+
+          // 2. Menu Option Lookup
+           const menu = MENUS[location.pathname];
+           const option = menu?.options.find(o => o.id === n);
+ 
+           if (option) {
+               stopListening();
+               speak(`اخترت رقم ${n}: ${option.label}. صحيح؟`, () => {
+                   setConfirmingOption(option);
+                   playBeep();
+                   startListening();
+                   startWaitTimeout();
+               }, true);
+               setIsProcessing(false);
+               return;
+           }
+       }
+ 
+       // D. Fallback
+       stopListening();
+       speak("ما فهمتش الرقم. عاود اختار.", () => {
+          playBeep();
+          startListening();
+          startWaitTimeout();
+       }, true);
 
     } catch (err) {
       console.error("[VoiceOperator] Error:", err);
@@ -300,28 +371,27 @@ export default function VoiceOperator() {
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+      if (onboardingActive) return;
 
       const key = parseInt(e.key);
-      if (!isNaN(key) && key >= 1 && key <= 9) {
+      if (!isNaN(key) && key >= 0 && key <= 9) { // Support 0-9
         e.preventDefault();
-        // Simulate voice command for this number
-        // Or directly execute?
-        // User said: "Voice-only numbered selection". 
-        // But "Ensure the automation works for both keyboard input and spoken commands" (previous task).
-        // Let's treat keyboard as a direct selection WITHOUT confirmation for speed?
-        // Or WITH confirmation to match voice flow?
-        // Matching voice flow is safer.
-        handleVoiceCommand(`${key}`);
+        
+        // If there is an active command handler (like BankFlow), delegate to it!
+        if (commandHandler) {
+            console.log("[VoiceOperator] Delegating keyboard input to active handler:", key);
+            commandHandler(key.toString());
+            return;
+        }
+
+        // Otherwise use local logic (Menu Navigation)
+        handleVoiceCommand(`${key}`, { fromKeyboard: true });
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleVoiceCommand]); // Dependency on handleVoiceCommand (which is stable via ref or callback?)
-  // handleVoiceCommand is not stable as defined above (re-created every render).
-  // I should wrap handleVoiceCommand in useCallback or use ref.
-  // Actually, I defined handleVoiceCommand inside the component, so it changes.
-  // I'll wrap it in useCallback or just disable the warning.
+  }, [handleVoiceCommand, commandHandler, onboardingActive]); // Add commandHandler dependency
 
   return null;
 }

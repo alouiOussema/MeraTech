@@ -14,15 +14,62 @@ export const log = (type, message, data = null) => {
   );
 };
 
+export const normalizeTTS = (text) => {
+  if (!text) return "";
+  
+  // 1. Log before
+  const original = text;
+  
+  let normalized = text
+    .replace(/المريقل/g, "تمام")
+    .replace(/توا/g, "الآن")
+    .replace(/باهي/g, "باهِي");
+
+  // 2. Fix Phrasing Order (Problem 1)
+  // Replace variants of "باهي بينا هيا" to "باهي هيا بينا"
+  if (normalized.includes("بينا هيا") || normalized.includes("باهِي. بينا") || normalized.includes("باهِي بينا")) {
+     normalized = normalized
+       .replace(/باهِي\. بينا هيا/g, "باهِي. هيا بينا")
+       .replace(/باهِي بينا هيا/g, "باهِي. هيا بينا")
+       .replace(/بينا هيا/g, "هيا بينا")
+       .replace(/باهِي\. بينا/g, "باهِي. هيا بينا");
+  }
+
+  // 3. Fix Arabic Article "لالـ" -> "للـ" for known routes
+  const routeFixes = [
+    { wrong: "لالدخول", right: "للدخول" },
+    { wrong: "لالتسجيل", right: "للتسجيل" },
+    { wrong: "لالمنتجات", right: "للمنتجات" },
+    { wrong: "لالبنك", right: "للبنك" },
+    { wrong: "لالإعدادات", right: "للإعدادات" }
+  ];
+
+  routeFixes.forEach(fix => {
+    if (normalized.includes(fix.wrong)) {
+      normalized = normalized.replace(new RegExp(fix.wrong, 'g'), fix.right);
+    }
+  });
+
+  // Log if changed
+  if (normalized !== original) {
+    log("info", `[TTS] normalized: "${original}" -> "${normalized}"`);
+  }
+
+  return normalized;
+};
+
 export const speak = (text, onEnd, onError, customRate = null) => {
   if (!window.speechSynthesis) {
     log("error", "Speech Synthesis not supported");
     return;
   }
 
+  // Global Normalization
+  const cleanText = normalizeTTS(text);
+
   const doSpeak = () => {
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
+    const utterance = new SpeechSynthesisUtterance(cleanText);
     const voices = window.speechSynthesis.getVoices();
     const arabicVoice =
       voices.find(
@@ -53,7 +100,7 @@ export const speak = (text, onEnd, onError, customRate = null) => {
     utterance.rate = customRate !== null ? customRate : 0.9;
     utterance.pitch = 1;
 
-    utterance.onstart = () => log("info", `Speaking: "${text}"`);
+    utterance.onstart = () => log("info", `Speaking: "${cleanText}"`);
 
     utterance.onend = () => {
       log("info", "Finished speaking");

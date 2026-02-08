@@ -19,12 +19,20 @@ export default function CartDrawer() {
   const { speak } = useVoice();
   const navigate = useNavigate();
 
-  const handleCheckout = () => {
-    checkout();
-    const msg = "الطلب متاعك تسجل وقاعد يتحضر باش يوصلك.";
-    speak(msg);
-    alert(msg);
-    setIsCartOpen(false);
+  const handleCheckout = async () => {
+    const { success, error } = await checkout();
+    
+    if (success) {
+      const msg = "الطلب متاعك تسجل وقاعد يتحضر باش يوصلك. وفلوسك تقصت من البانكة.";
+      speak(msg);
+      // alert(msg); // Removed alert to use voice only or custom UI
+      setIsCartOpen(false);
+      navigate('/banque'); // Navigate to bank/history page as requested
+    } else {
+      const msg = `مشكلة في الدفع: ${error}`;
+      speak(msg);
+      alert(msg);
+    }
   };
 
   if (!isCartOpen) return null;

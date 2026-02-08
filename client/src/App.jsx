@@ -3,6 +3,7 @@ import { Route, BrowserRouter as Router, Routes, Navigate } from 'react-router-d
 import VoiceOperator from './assistant/VoiceOperator';
 import AccessibleControls from './components/AccessibleControls';
 import VoiceAssistant from './components/VoiceAssistant';
+import AudioUnlockOverlay from './components/AudioUnlockOverlay';
 import { AccessibilityProvider } from './context/AccessibilityContext';
 import { useAuth } from './context/AuthContext';
 import { VoiceProvider } from './context/VoiceContext';
@@ -30,13 +31,13 @@ function AxiosSetup() {
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoaded } = useAuth();
-  
+
   if (!isLoaded) {
     return <div className="min-h-screen flex items-center justify-center">تحميل...</div>;
   }
   
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" state={{ message: "لازم تدخل الأول." }} replace />;
   }
 
   return children;
@@ -62,6 +63,12 @@ function App() {
                 <Products />
               </Layout>
             } />
+            
+            <Route path="/settings" element={
+              <Layout>
+                <Settings />
+              </Layout>
+            } />
 
             {/* Protected/App Routes */}
             <Route path="/banque" element={
@@ -72,14 +79,6 @@ function App() {
               </ProtectedRoute>
             } />
             
-            <Route path="/settings" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Settings />
-                </Layout>
-              </ProtectedRoute>
-            } />
-
             <Route path="/profile" element={
               <ProtectedRoute>
                 <Layout>
@@ -93,6 +92,7 @@ function App() {
           <VoiceOperator />
           <VoiceAssistant />
           <AccessibleControls />
+          <AudioUnlockOverlay />
           
         </VoiceProvider>
       </Router>

@@ -81,10 +81,16 @@ export const CartProvider = ({ children }) => {
     setCartItems([]);
   };
 
-  const checkout = () => {
-    // In a real app, this would send an order to the backend
-    setCartItems([]);
-    return true;
+  const checkout = async () => {
+    try {
+      const result = await checkoutOrder(cartItems);
+      setCartItems([]);
+      return { success: true, result };
+    } catch (error) {
+      console.error("Checkout failed:", error);
+      const message = error.response?.data?.message || 'فشل في عملية الدفع';
+      return { success: false, error: message };
+    }
   };
 
   const toggleCart = () => setIsCartOpen(!isCartOpen);
